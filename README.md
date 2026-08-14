@@ -72,10 +72,12 @@ Press **Backtick** to reveal teleport, collision, noclip, wireframe, and sequenc
 ## Technical highlights
 
 - TypeScript, Three.js/WebGL, Vite, Web Audio API.
-- Procedural runtime geometry, materials, planets, terrain, jungle, particles, water, ruins, textures, and synthesized sound—no downloaded media assets.
+- CC0 HDRI image-based lighting and reflections (Poly Haven environments, bundled locally via `@pmndrs/assets` — no hot-linking) combined with authored runtime PBR detail maps (albedo, normal, roughness, baked AO) so no surface ships as flat color.
+- Deliberate lighting rig: rectangular area lights, spotlights, controlled ambient/hemisphere fill and a shadow-casting planetary sun.
 - Automated floor/wall/ceiling/centroid pivot normalization and downward ray-clamp placement pipeline.
 - Simplified AABB/cylinder collision hulls aligned to normalized geometry.
-- Collision-safe automatic doors with obstruction checks.
+- Collision-safe automatic doors with obstruction checks, plus a tween animator that gives lockers, freezer glass, crates, valves and levers smooth mechanical motion.
+- A cinematic director that composes keyframed camera shots for warp spin-up/tunnel/exit and atmospheric entry/landing, with a visible ground approach during final descent.
 - Full 6-DOF ship state, three flight cameras, target locking, fuel, dampeners, and physical interlocks.
 - Multi-stage warp, re-entry, gear hold, descent, touchdown dust, and persistent landed state.
 - LocalStorage checkpoints and settings.

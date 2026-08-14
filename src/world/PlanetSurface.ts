@@ -4,10 +4,12 @@ import type { AmbientSystem } from '../systems/AmbientSystem';
 import type { Quality } from '../types';
 import { Random } from '../core/Random';
 import { normalizeGeometryPivot, normalizedBox, normalizedCylinder, snapToSurface } from './geometryAlignment';
-import { COLORS, emissive, glass, matte, metal } from './materials';
+import { COLORS, emissive, glass, matte, metal, rockMat } from './materials';
+import { rock as rockMaps } from '../core/PBRMaps';
 
 export class PlanetSurface {
   readonly root = new THREE.Group();
+  readonly ground = new THREE.Group();
   readonly terrain: THREE.Mesh;
   readonly terrainSize = 440;
   visible = false;
@@ -26,9 +28,11 @@ export class PlanetSurface {
     this.collision = collision;
     this.ambient = ambient;
     this.root.name = 'Nemora IV — Procedural Jungle';
+    this.ground.name = 'Nemora IV — Ground Detail';
     this.root.visible = false;
+    this.root.add(this.ground);
     this.terrain = this.buildTerrain(quality);
-    this.root.add(this.terrain);
+    this.ground.add(this.terrain);
     scene.add(this.root);
     this.root.updateMatrixWorld(true);
     this.buildSky();
@@ -40,6 +44,11 @@ export class PlanetSurface {
     this.buildClearPath();
     this.root.updateMatrixWorld(true);
     this.registerSurfaceColliders();
+  }
+
+  /** Offsets the ground vertically (metres) so the landing descent reads as motion. */
+  setDescent(offsetY: number): void {
+    this.ground.position.y = offsetY;
   }
 
   terrainHeightAt = (x: number, z: number): number => {
@@ -85,7 +94,11 @@ export class PlanetSurface {
     }
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geometry.computeVertexNormals();
-    const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.93, metalness: 0.01 });
+    const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, metalness: 0.02 });
+    const detail = rockMaps(0xcfcfcf, { seed: 0x7e41a11 });
+    material.normalMap = detail.normalMap;
+    material.roughnessMap = detail.roughnessMap;
+    material.normalScale = new THREE.Vector2(0.75, 0.75);
     const terrain = new THREE.Mesh(geometry, material);
     terrain.name = 'Nemora terrain collision surface';
     terrain.receiveShadow = true;
@@ -107,18 +120,27 @@ export class PlanetSurface {
     const sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.radialTexture(0xfff4b0, 0xff5ca8), transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));
     sun.position.set(-145, 190, -250);
     sun.scale.set(55, 55, 1);
-    const moon = new THREE.Mesh(new THREE.SphereGeometry(19, 24, 16), matte(0x98b7d9, 0.86));
+    const moon = new THREE.Mesh(new THREE.SphereGeometry(19, 24, 16), rockMat(0x98b7d9, 0.9));
     moon.position.set(180, 125, -270);
     const ring = new THREE.Mesh(new THREE.RingGeometry(25, 42, 56), new THREE.MeshBasicMaterial({ color: 0xc6aaff, transparent: true, opacity: 0.4, side: THREE.DoubleSide }));
     ring.rotation.x = Math.PI / 2.5;
     moon.add(ring);
     this.root.add(sun, moon);
 
-    const light = new THREE.DirectionalLight(0xffc5d9, 2.65);
+    const light = new THREE.DirectionalLight(0xffc5d9, 2.8);
     light.position.set(-110, 180, -90);
     light.target.position.set(10, 0, 120);
+    light.castShadow = true;
+    light.shadow.mapSize.set(2048, 2048);
+    light.shadow.camera.left = -240;
+    light.shadow.camera.right = 240;
+    light.shadow.camera.top = 240;
+    light.shadow.camera.bottom = -240;
+    light.shadow.camera.far = 520;
+    light.shadow.bias = -0.0004;
+    light.shadow.normalBias = 0.5;
     this.root.add(light, light.target);
-    const fill = new THREE.HemisphereLight(0x916ddd, 0x183423, 1.45);
+    const fill = new THREE.HemisphereLight(0x916ddd, 0x183423, 1.05);
     this.root.add(fill);
   }
 
@@ -139,15 +161,15 @@ export class PlanetSurface {
 
   private snapObject(object: THREE.Object3D, x: number, z: number, align = false): void {
     object.position.set(x, 45, z);
-    this.root.add(object);
-    this.root.updateMatrixWorld(true);
+    this.ground.add(object);
+    this.ground.updateMatrixWorld(true);
     snapToSurface(object, [this.terrain], this.raycaster, { alignToNormal: align, epsilon: 0.001, maxDistance: 70 });
   }
 
   private buildVegetation(quality: Quality): void {
     const treeCount = quality === 'high' ? 105 : quality === 'medium' ? 70 : 42;
     const trunkGeometry = normalizedCylinder(0.72, 1.25, 14, 9);
-    const trunkMaterial = matte(0x3a2845, 0.95);
+    const trunkMaterial = rockMat(0x3a2845, 0.95);
     const leafMaterial = new THREE.MeshStandardMaterial({ color: 0x357853, roughness: 0.78, emissive: 0x123d2c, emissiveIntensity: 0.32 });
     this.foliageMaterials.push(leafMaterial);
     for (let i = 0; i < treeCount; i += 1) {
@@ -160,9 +182,12 @@ export class PlanetSurface {
       const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
       trunk.scale.set(scale, scale, scale);
       trunk.rotation.z = this.random.range(-0.08, 0.08);
+      trunk.castShadow = true;
+      trunk.receiveShadow = true;
       tree.add(trunk);
       for (let level = 0; level < 3; level += 1) {
         const crown = new THREE.Mesh(new THREE.IcosahedronGeometry((4.6 - level * 0.6) * scale, 1), leafMaterial);
+        crown.castShadow = true;
         crown.scale.y = 0.48;
         crown.position.set(this.random.range(-1, 1), (11.5 + level * 2.3) * scale, this.random.range(-1, 1));
         crown.rotation.y = this.random.range(0, Math.PI);
@@ -202,7 +227,7 @@ export class PlanetSurface {
       ferns.setMatrixAt(i, dummy.matrix);
     }
     ferns.instanceMatrix.needsUpdate = true;
-    this.root.add(ferns);
+    this.ground.add(ferns);
 
     const glowCount = quality === 'high' ? 160 : 90;
     const glowGeometry = normalizeGeometryPivot(new THREE.SphereGeometry(0.32, 9, 6), 'floor');
@@ -223,7 +248,7 @@ export class PlanetSurface {
       glowPlants.setMatrixAt(i, dummy.matrix);
     }
     glowPlants.instanceMatrix.needsUpdate = true;
-    this.root.add(glowPlants);
+    this.ground.add(glowPlants);
     this.ambient.pulse(glowMaterial, 1.1, 0.7, 1.1);
 
     this.buildVines();
@@ -242,7 +267,7 @@ export class PlanetSurface {
         new THREE.Vector3(x + this.random.range(-3, 3), y - 11, z + this.random.range(-3, 3)),
       ];
       const curvePoints = new THREE.CatmullRomCurve3(points).getPoints(18);
-      this.root.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(curvePoints), vineMaterial));
+      this.ground.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(curvePoints), vineMaterial));
     }
   }
 
@@ -261,7 +286,7 @@ export class PlanetSurface {
 
   private buildRocks(quality: Quality): void {
     const count = quality === 'high' ? 120 : 70;
-    const material = matte(0x33403d, 0.98);
+    const material = rockMat(0x33403d, 0.98);
     for (let i = 0; i < count; i += 1) {
       const geometry = normalizeGeometryPivot(new THREE.DodecahedronGeometry(this.random.range(0.45, 2.8), 0), 'floor');
       const rock = new THREE.Mesh(geometry, material);
@@ -277,7 +302,7 @@ export class PlanetSurface {
   private buildRuins(): void {
     const ruin = new THREE.Group();
     ruin.name = 'The Resonant Ruins';
-    const stone = matte(0x485552, 0.98);
+    const stone = rockMat(0x485552, 0.98);
     const rune = emissive(0x6affda, 1.5);
     const center = new THREE.Vector3(-28, this.terrainHeightAt(-28, 137), 137);
     ruin.position.copy(center);
@@ -312,7 +337,7 @@ export class PlanetSurface {
     this.ambient.float(runeCore, 0.22, 1.2);
     this.ambient.spin(runeCore, new THREE.Vector3(0, 1, 0), 0.45);
     this.ambient.pulse(rune, 1.1, 1.2, 1.45);
-    this.root.add(ruin);
+    this.ground.add(ruin);
     this.collidableObjects.push({ object: monolith, radius: 1.5 });
   }
 
@@ -332,14 +357,14 @@ export class PlanetSurface {
     const pool = new THREE.Mesh(new THREE.CircleGeometry(13, 64), poolMaterial);
     pool.rotation.x = -Math.PI / 2;
     pool.position.set(poolX, baseY, poolZ);
-    this.root.add(pool);
+    this.ground.add(pool);
 
-    const cliffStone = matte(0x2d3838, 0.98);
+    const cliffStone = rockMat(0x2d3838, 0.98);
     for (let i = 0; i < 20; i += 1) {
       const rock = new THREE.Mesh(normalizeGeometryPivot(new THREE.DodecahedronGeometry(this.random.range(1.8, 4.8), 0), 'floor'), cliffStone);
       rock.scale.set(this.random.range(0.8, 1.8), this.random.range(1.0, 2.8), this.random.range(0.7, 1.5));
       rock.position.set(poolX - 10 + (i % 5) * 4.5, baseY + Math.floor(i / 5) * 3.3, poolZ + 13 + this.random.range(-1, 1));
-      this.root.add(rock);
+      this.ground.add(rock);
       this.collidableObjects.push({ object: rock, radius: 1.6 });
     }
 
@@ -355,11 +380,11 @@ export class PlanetSurface {
     this.waterMaterials.push(fallMaterial);
     const waterfall = new THREE.Mesh(new THREE.PlaneGeometry(9, 18, 18, 28), fallMaterial);
     waterfall.position.set(poolX, baseY + 11, poolZ + 11.7);
-    this.root.add(waterfall);
+    this.ground.add(waterfall);
 
     const glow = new THREE.PointLight(0x36ffd2, 22, 48, 1.8);
     glow.position.set(poolX, baseY + 2.2, poolZ);
-    this.root.add(glow);
+    this.ground.add(glow);
   }
 
   private buildAtmosphere(quality: Quality): void {
@@ -377,7 +402,7 @@ export class PlanetSurface {
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     this.spores = new THREE.Points(geometry, new THREE.PointsMaterial({ size: 0.17, vertexColors: true, transparent: true, opacity: 0.78, blending: THREE.AdditiveBlending, depthWrite: false }));
-    this.root.add(this.spores);
+    this.ground.add(this.spores);
 
     const mistCount = quality === 'high' ? 380 : 180;
     const mistPos = new Float32Array(mistCount * 3);
@@ -389,7 +414,7 @@ export class PlanetSurface {
     const mistGeometry = new THREE.BufferGeometry();
     mistGeometry.setAttribute('position', new THREE.BufferAttribute(mistPos, 3));
     this.mist = new THREE.Points(mistGeometry, new THREE.PointsMaterial({ size: 1.5, color: 0xb8faff, transparent: true, opacity: 0.18, depthWrite: false }));
-    this.root.add(this.mist);
+    this.ground.add(this.mist);
 
     // Volumetric-style light cones approximate canopy god rays without post-process cost.
     const rayMaterial = new THREE.MeshBasicMaterial({ color: 0xffd5de, transparent: true, opacity: 0.035, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
@@ -397,17 +422,17 @@ export class PlanetSurface {
       const ray = new THREE.Mesh(new THREE.ConeGeometry(this.random.range(3, 7), this.random.range(30, 55), 10, 1, true), rayMaterial);
       ray.position.set(this.random.range(-145, 145), 24, this.random.range(95, 205));
       ray.rotation.z = this.random.range(-0.18, 0.18);
-      this.root.add(ray);
+      this.ground.add(ray);
     }
 
     const groundFog = new THREE.Mesh(new THREE.PlaneGeometry(420, 270), new THREE.MeshBasicMaterial({ color: 0x5c77a0, transparent: true, opacity: 0.035, depthWrite: false }));
     groundFog.rotation.x = -Math.PI / 2;
     groundFog.position.set(0, -1, 80);
-    this.root.add(groundFog);
+    this.ground.add(groundFog);
   }
 
   private buildClearPath(): void {
-    const pathMaterial = matte(0x40523d, 0.98);
+    const pathMaterial = rockMat(0x40523d, 0.98);
     const points = [new THREE.Vector2(0, 84), new THREE.Vector2(4, 108), new THREE.Vector2(-14, 131), new THREE.Vector2(18, 158)];
     for (let segment = 0; segment < points.length - 1; segment += 1) {
       const start = points[segment];
@@ -418,7 +443,7 @@ export class PlanetSurface {
       const midpoint = start.clone().add(end).multiplyScalar(0.5);
       path.position.set(midpoint.x, this.terrainHeightAt(midpoint.x, midpoint.y) + 0.015, midpoint.y);
       path.rotation.y = angle;
-      this.root.add(path);
+      this.ground.add(path);
     }
   }
 
@@ -460,6 +485,7 @@ export class PlanetSurface {
       this.collision.terrainHeight = null;
       this.collision.terrainNormal = null;
       for (const collider of this.collision.cylinders) if (collider.id.startsWith('surface:')) collider.enabled = false;
+      this.ground.position.y = 0;
     }
   }
 

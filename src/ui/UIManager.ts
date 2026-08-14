@@ -96,7 +96,7 @@ export class UIManager {
 
         <section id="credits-panel" class="command-slate modal credits hidden" aria-labelledby="credits-title">
           <div class="slate-eyebrow"><i></i> EX-07 // MANIFEST</div><h2 id="credits-title">MISSION CREDITS</h2>
-          <div class="credits-copy"><h3>AEON DRIFT: THE VERDANT SIGNAL</h3><p>Original browser game created for the Space Exploration Game specification.</p><p><strong>ENGINE</strong><br>TypeScript · Three.js · WebGL · Web Audio API</p><p><strong>ASSET MANIFEST</strong><br>Every model, material, texture, star field, planet, sound, jungle plant, ruin, ship prop, particle and interface graphic is generated procedurally at runtime. No downloaded media assets are used.</p><p>Three.js is provided under the MIT License. Full attribution is available in <code>ASSET_CREDITS.md</code>.</p></div>
+          <div class="credits-copy"><h3>AEON DRIFT: THE VERDANT SIGNAL</h3><p>Original browser game created for the Space Exploration Game specification.</p><p><strong>ENGINE</strong><br>TypeScript · Three.js · WebGL · Web Audio API</p><p><strong>ENVIRONMENT &amp; LIGHTING</strong><br>Image-based lighting and reflections use CC0 HDRI environments by <strong>Poly Haven</strong> (polyhaven.com), bundled locally via the CC0 <strong>@pmndrs/assets</strong> package.</p><p><strong>PROCEDURAL ART</strong><br>Geometry, authored PBR detail maps, star fields, planets, terrain, jungle, water, particles, warp effects and synthesized audio are generated at runtime.</p><p>Three.js is provided under the MIT License. Full attribution is available in <code>ASSET_CREDITS.md</code>.</p></div>
           <div class="modal-actions"><button data-action="close-modal" class="terminal-button primary">RETURN</button></div>
         </section>
 

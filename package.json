@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@pmndrs/assets": "^1.7.0",
     "three": "^0.179.1"
   },
   "devDependencies": {

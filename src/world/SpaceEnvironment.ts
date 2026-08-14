@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { CelestialTarget } from '../types';
 import { Random } from '../core/Random';
-import { COLORS, emissive, glass, metal } from './materials';
+import { COLORS, emissive, glass, metal, rockMat } from './materials';
 
 export class SpaceEnvironment {
   readonly root = new THREE.Group();
@@ -145,7 +145,7 @@ export class SpaceEnvironment {
         planet.add(rings);
       }
       if (definition.moon && !definition.isDestination) {
-        const moon = new THREE.Mesh(new THREE.SphereGeometry(definition.radius * 0.17, 18, 12), metal(0x9eaaa9, 0.88, 0.02));
+        const moon = new THREE.Mesh(new THREE.SphereGeometry(definition.radius * 0.17, 18, 12), rockMat(0x9eaaa9, 0.9));
         moon.position.set(definition.radius * 1.8, definition.radius * 0.35, 0);
         planet.add(moon);
       }
@@ -165,7 +165,7 @@ export class SpaceEnvironment {
   private buildAsteroids(count: number): void {
     const random = new Random(0xb317);
     const geometry = new THREE.IcosahedronGeometry(45, 1);
-    const material = metal(0x4d514d, 0.94, 0.08);
+    const material = rockMat(0x4d514d, 0.95);
     this.asteroidBelt = new THREE.InstancedMesh(geometry, material, count);
     const dummy = new THREE.Object3D();
     for (let i = 0; i < count; i += 1) {
