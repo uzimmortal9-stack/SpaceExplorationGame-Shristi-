@@ -1,0 +1,1240 @@
+Create a fully playable, polished 3D sci-fi space exploration game. It should be built either as a browser-based game or as a standalone game using a custom game engine, whichever you are best able to implement cleanly and reliably.
+
+If building in the browser, use a modular pure JavaScript or TypeScript WebGL/WebGPU implementation with a clean project structure. If building a custom engine, use a traditional, reliable game-development language such as C++ with OpenGL, Vulkan, or DirectX, and use appropriate libraries for windowing, input, math, audio, and model loading.
+
+Use downloaded 3D models and external image textures where useful, especially for ship interiors, props, furniture, panels, seats, tools, storage units, terrain detail, vegetation, rocks, ruins, and sci-fi equipment. If downloaded assets are not available for something, generate high-quality procedural geometry, materials, and audio instead. Keep a list of external assets and credits.
+
+The game must feel complete, immersive, and playable from start to finish. The player should be able to explore the starship interior in first person, sit in the pilot seat, fly the ship in space, select a destination, initiate a warp jump, enter an alien planet’s atmosphere, land on the surface, exit the ship, and explore the alien jungle planet on foot. All major transitions should feel smooth, seamless, and cinematic.
+
+---
+
+## 1. Starship Interior — First-Person Exploration
+
+### General Interior Requirements
+
+Create a fully traversable sci-fi starship interior. The ship should feel like a believable, lived-in spacecraft used by a small crew for long-duration exploration. The interior should be modular, logically connected, and easy to navigate.
+
+The ship must include:
+
+- Clean first-person movement with proper collision detection.
+- Fully functional automatic sliding doors between rooms.
+- Door opening and closing animations with hydraulic or mechanical sound effects.
+- Door obstruction safety behavior so doors do not close on the player.
+- Proper walkable clearance through all doorways and corridors.
+- No blocking props, floating objects, invisible walls, or clutter trapping the player.
+- Smooth lighting transitions between rooms.
+- Subtle sci-fi ambient hum throughout the ship.
+- Functional switches, buttons, panels, seats, storage units, terminals, and interactive props wherever possible.
+- Interior signage and small labels to help the player identify rooms and systems.
+- A cohesive sci-fi visual style: metallic panels, glowing trim lights, utility conduits, soft blue/white interior lighting, warning accents near engineering areas, and warm lighting in crew quarters.
+- Environmental storytelling: personal items, tools, notebooks, bags, photos, plants, maintenance panels, supply crates, and small decorative details.
+
+Do not show permanent control-key hints on the screen. Show the controls only once when the player first enters the ship. After that, controls should only be accessible from a Settings panel.
+
+---
+
+## 2. Cockpit / Bridge
+
+The bridge should be the command center of the ship and one of the most detailed rooms.
+
+Include:
+
+- Two pilot seats positioned side by side.
+- A detailed dashboard/console in front of both seats.
+- Glowing indicators, toggle switches, warning lights, and status displays.
+- A large front viewport showing space outside.
+- Side windows showing stars, planets, and nearby celestial bodies.
+- Interactive navigation display screen.
+- Interactive target selection system.
+- A floating 3D holographic projection of the solar system between the two pilot chairs.
+- The hologram should rotate slowly, display orbital paths, and highlight selectable planets/moons.
+- Ship dashboard HUD elements should feel diegetic or semi-diegetic, not like flat modern UI unless necessary.
+- Seat interaction: player can walk up to the pilot seat and press interact to sit down.
+- When seated, the camera smoothly transitions into first-person cockpit view.
+- Player can stand up again using an interact key.
+- Optional third-person chase camera and cinematic orbital camera modes can be toggled while flying.
+- A physical acceleration/throttle button located under a safety lid.
+  - The safety lid must be opened first.
+  - Then the acceleration button becomes usable.
+  - This should feel tactile and mechanical.
+- A dedicated warp control pedestal or dashboard-integrated warp controls.
+- Dashboard displays for:
+  - Speed/velocity.
+  - Throttle level.
+  - Hull integrity.
+  - Fuel level.
+  - Shield status if included.
+  - Current target.
+  - Planetary lock status.
+  - Warp drive status.
+  - Atmospheric entry warnings.
+- The cockpit should have clear visibility of space and the landing zone during descent.
+
+---
+
+## 3. Living Quarters / Crew Quarters
+
+The living quarters should feel personal, comfortable, and functional. This area should contrast with the more technical parts of the ship.
+
+### Bedrooms / Crew Cabins
+
+Create two separate crew bedrooms or two sleeping cabin areas.
+
+Each bedroom should include:
+
+- A bed with simple interaction to rest or skip time if desired.
+- A space-view window directly beside the bed.
+- The window should use PDLC smart film behavior.
+  - A button near the bed toggles the window from transparent to opaque black.
+  - When transparent, it shows the outside space environment.
+  - When blackened, it blocks the view and darkens the room slightly.
+- A workstation with a chair.
+- A table or shelf surface large enough to hold a laptop and small objects.
+- One laptop prop.
+  - The laptop can optionally have an interactive screen showing ship logs, personal notes, star charts, or mission data.
+- A wall-mounted screen in front of the workstation.
+- A decorative artificial plant.
+- A laptop mouse prop.
+- A notebook.
+- A space pencil or stylus.
+- A small desk lamp with a toggleable light.
+- A cabinet or locker for clothes.
+  - Include at least one space suit or pressure suit.
+  - Include daily clothing items such as jackets, uniforms, or folded clothes.
+- A family photo or personal photo mounted on the wall or placed on a shelf.
+- Personal bags and luggage stored nearby.
+- A rack or shelf for decorative models, books, small trophies, souvenirs, or collectible items.
+- Soft warm lighting compared to the rest of the ship.
+- Subtle personal details to make the room feel inhabited.
+
+---
+
+## 4. Storage Room
+
+Create a dedicated storage room for supplies, food, tools, spare parts, and crew equipment.
+
+Include:
+
+- Modular storage units and cabinets.
+- Labeled crates and containers.
+- A freezer shelf for food storage.
+  - The freezer should have transparent glass.
+  - The glass door should slide up and down in two parts.
+  - The player can interact to open/close the freezer glass.
+  - Inside, show food containers, ration packs, sealed pouches, or cryo-stored supplies.
+- A separate tools and utility storage area.
+  - Wrenches, cutters, scanners, flashlights, portable repair kits, cables, and diagnostic devices.
+- Crew personal storage areas.
+  - Lockers or personal crates assigned to crew members.
+- Ship repair parts storage.
+  - Spare panels, circuit boards, coolant canisters, fuel line components, sealant kits, and mechanical parts.
+- Magnetic clamps, straps, cargo nets, or zero-g restraints to make the storage feel spacecraft-appropriate.
+- Some functional lockers that open and close when interacted with.
+- Clean collision so the player can move through the room without getting stuck.
+
+---
+
+## 5. Fuel Storage Room
+
+Create a technical fuel storage and processing room.
+
+Include:
+
+- A transparent bulletproof glass window or observation panel allowing the player to visually check fuel tanks.
+- Visible fuel tanks or reservoirs behind glass.
+- Animated liquid or energy shader inside fuel storage if possible.
+- Pipes with valves.
+- Interactive valves that can be turned or toggled.
+- Wall-mounted screens for monitoring and diagnostics.
+- Fuel pressure, temperature, flow rate, and purity readings.
+- A fuel extractor unit.
+  - The extractor can be used to collect or extract hydrogen fuel for the ship.
+  - It should have an activation interaction.
+  - It can work when the ship is near a valid fuel source, such as a gas giant, hydrogen-rich nebula, comet, asteroid field, or surface hydrogen deposit.
+  - Include a simple collection/processing sequence.
+- A fuel processing unit.
+  - Converts raw hydrogen into usable ship fuel.
+  - Has status lights, animated processing elements, vents, and sound effects.
+- Warning labels and hazard markings.
+- Yellow/orange or cyan engineering lighting.
+- Subtle pipe hissing, coolant flow, or low electrical hum audio.
+
+---
+
+## 6. Toilets and Washrooms
+
+Create separate toilet/washroom facilities for crew use.
+
+Each washroom should include:
+
+- A toilet seat.
+- A bathtub or compact cleaning pod.
+- A shower area.
+- A basin sink.
+- A mirror above the sink.
+- Wall-mounted hygiene supplies.
+- Towels or cleaning cloths.
+- Small storage compartment for personal care items.
+- Clean, moisture-resistant sci-fi materials.
+- Soft lighting.
+- Optional interactive elements:
+  - Sink faucet activation.
+  - Shower activation.
+  - Light toggle.
+  - Mirror fog/steam effect if possible.
+  - Toilet flush sound or vacuum suction sound.
+
+Make the washrooms feel practical and spacecraft-like, not like ordinary Earth bathrooms, while still being recognizable.
+
+---
+
+## 7. Communication / Meeting Area
+
+Create a crew meeting and communication room.
+
+Include:
+
+- Six seats arranged around a table.
+- A central table with embedded controls or holographic display.
+- A projector or large wall-mounted TV/screen.
+- Star maps, mission briefings, communication logs, or navigation charts displayed on the screen.
+- A long-range communication console.
+- Optional interactive meeting mode where the player can trigger a mission briefing or ship status report.
+- Comfortable seating and clean player navigation around the table.
+- Subtle lighting focused on the table area.
+- Wall panels showing ship systems, communication signal strength, and external sensor data.
+
+---
+
+## 8. Living Space / Crew Lounge
+
+Create a shared living space where crew members can relax.
+
+Include:
+
+- Comfortable seating such as sofas, chairs, or bench modules.
+- A large viewport showing space outside.
+- A small entertainment screen or media panel.
+- Soft ambient lighting.
+- Decorative plants or artificial greenery.
+- A small shelf with books, games, or personal items.
+- A wall-mounted clock or mission-time display.
+- A coffee/tea station or beverage dispenser.
+  - The beverage station should be interactive.
+  - Player can press a button and receive a cup or animated drink prop.
+  - Include brewing or dispensing sound.
+- Optional zero-g decorative element, such as a floating pen, tethered ornament, or magnetic board game.
+- A warm, relaxed atmosphere compared to technical rooms.
+
+---
+
+## 9. Dining Area
+
+Create a dining area for the crew.
+
+Include:
+
+- A dining table.
+- Enough chairs or bench seating for the crew.
+- Food trays, utensils, cups, and sealed space food containers.
+- A food dispenser, galley unit, or compact kitchen station.
+- A heating unit or rehydration station.
+- A cleaning/sterilization station.
+- A window or viewport visible from the dining area if possible.
+- Functional cabinets containing food supplies.
+- Subtle warm lighting.
+- Interactive elements:
+  - Food dispenser button.
+  - Cabinet doors.
+  - Tray pickup.
+  - Optional sit-and-eat animation or camera interaction.
+
+---
+
+## 10. Medical Bay
+
+Create a clean, high-tech medical bay.
+
+Include:
+
+- One or two medical beds.
+- Overhead surgical lamp or scanner arm.
+- Vital signs monitors.
+- Medical cabinets with supplies.
+- A surgical tools tray.
+- A diagnostic scanner.
+- A medication storage unit.
+- A cryo-stasis pod or emergency recovery pod if appropriate.
+- A medical terminal displaying patient data or crew health summaries.
+- Sterile white/blue lighting.
+- Optional interactive medical scanner that can scan the player or crew and display simple health information.
+- Clean surfaces, rounded edges, and a calm atmosphere.
+
+---
+
+## 11. Defense and Security Room
+
+Create a defense and security room located near the cockpit or bridge.
+
+Include:
+
+- Weapon lockers or armory cabinets.
+- Stored rifles, sidearms, or sci-fi security tools.
+- Ammo or energy cell storage.
+- Armor or protective equipment.
+- A security console.
+- Controls for rear and side ship guns.
+- Camera feeds showing exterior and interior ship views.
+- Threat detection screen.
+- Door lock/security override panel.
+- Warning lights or red alert lighting mode.
+- Optional turret control interaction:
+  - Player can access a turret camera view from the security room.
+  - Can rotate or aim rear/side guns without necessarily requiring full combat gameplay.
+
+The room should feel organized, tactical, and controlled.
+
+---
+
+## 12. Science and Research Room / Lab
+
+Create a science lab for research and analysis.
+
+Include:
+
+- Lab benches.
+- Sample containers.
+- Microscopes or alien specimen scanners.
+- Holographic analysis table.
+- Test tubes, vials, sealed canisters, and geological samples.
+- Plant sample containment area.
+- A small alien artifact display or storage case.
+- A research terminal.
+- Wall screens showing chemical composition, atmospheric analysis, or biological scans.
+- Interactive sample analysis sequence:
+  - Player places or selects a sample.
+  - The machine scans it.
+  - A hologram or screen displays results.
+- Cool blue/green lighting.
+- Clean, precise sci-fi lab atmosphere.
+
+---
+
+## 13. Ship Maintenance Rooms
+
+Create maintenance and engineering areas that support the ship’s major systems.
+
+Include:
+
+### Engine Core Area
+- Visible engine core or propulsion system.
+- Animated rotating conduits or turbine-like components.
+- Glowing energy pipes.
+- Heat vents and warning lights.
+- Maintenance catwalks or access platforms.
+
+### Reactor Core Area
+- A central reactor core with glowing energy.
+- Animated pulse effects.
+- Containment rings or magnetic stabilizers.
+- Control panels for reactor output and temperature.
+- Warning signage and radiation hazard markings.
+- Deep humming audio that intensifies near the reactor.
+
+### Additional Maintenance Rooms
+- Coolant control room.
+- Air circulation machinery.
+- Electrical relay room.
+- Spare parts workshop.
+- Diagnostic wall panels.
+- Tool racks.
+- Maintenance access hatches.
+
+The engineering section should feel industrial, powerful, and slightly dangerous.
+
+---
+
+## 14. Warp Drive / Engine Room
+
+Create a dedicated warp drive/engine room with a strong visual identity.
+
+Include:
+
+- A central glowing warp power core.
+- Animated rotating conduits around or inside the core.
+- Energy-pulse light pipes.
+- Animated energy flow moving through cables or tubes.
+- A dedicated warp control pedestal.
+- An openable red safety switch cover.
+  - The player must interact to open the cover.
+  - Under the cover is a physical lever or launch switch.
+- A physical warp lever.
+  - Pulling the lever initiates the warp sequence.
+- Wall displays showing warp charge status, core temperature, stability, and target coordinates.
+- Audio build-up as the warp core charges.
+- Screen shake and lighting pulses during warp spin-up.
+- Optional warning lights and safety interlock sounds.
+- The room should feel impressive, energetic, and central to the ship’s operation.
+
+---
+
+## 15. Cargo Bay / Airlock Ramp
+
+Create a cargo bay and rear boarding/exit area.
+
+Include:
+
+- A rear boarding hatch/ramp.
+- The ramp lowers smoothly to the surface when landing.
+- The ramp animation should be clean and collision-safe.
+- No clipping into terrain or ship geometry.
+- Cargo crates, pallets, and storage containers.
+- Cargo restraints and magnetic locks.
+- A small cargo loader or hand truck if desired.
+- Airlock doors with pressure warning lights.
+- Suit-up station near the cargo bay or airlock.
+- An external hatch status panel.
+- The cargo bay should logically connect to the ship’s exterior and allow the player to walk out onto the planet surface.
+
+---
+
+## 16. Airlock and Suit Station
+
+Create an airlock and EVA suit station.
+
+Include:
+
+- Wall-mounted EVA suits.
+- At least one fully detailed suit assigned to the player.
+- Helmet rack or suit storage alcove.
+- A suit-up terminal.
+- Interactive suit status display:
+  - Oxygen level.
+  - Suit pressure.
+  - Battery/power.
+  - Thermal regulation.
+- Optional suit-up sequence:
+  - Player interacts with the suit station.
+  - Suit status becomes active.
+  - This is not required to block gameplay unless atmosphere requires it, but it should feel immersive.
+- Airlock cycle behavior:
+  - Inner door closes before outer door opens.
+  - Warning lights and pressure sounds.
+  - Safe player collision throughout the cycle.
+
+---
+
+## 17. Utility and Access Areas
+
+Create utility and access spaces that make the ship feel structurally believable.
+
+Include:
+
+- Corridors connecting all major rooms.
+- Stairwells or small lifts if the ship has multiple levels.
+- Maintenance tunnels or narrow service passages.
+- Airlocks.
+- Docking bay or docking port area.
+  - Can be visual/functional.
+  - Include docking clamps, guidance lights, and external hatch.
+- Access panels.
+- Electrical conduits.
+- Pipe systems.
+- Ventilation shafts.
+- Emergency ladders or handholds if appropriate.
+- Clear navigation paths for the player.
+
+---
+
+## 18. Life Support Systems
+
+Create a life support area or integrated life support machinery.
+
+Include:
+
+- Air recycling units.
+- Oxygen generation panels.
+- CO₂ scrubbers.
+- Water purification system.
+- Environmental control/HVAC system.
+- Temperature regulation displays.
+- Humidity and airflow status screens.
+- Animated fans, filters, or fluid pipes.
+- Subtle air-flow sound design.
+- Interactive diagnostic panel showing life support health.
+
+---
+
+## 19. Power Distribution
+
+Create a power distribution area or section.
+
+Include:
+
+- Electrical grid management panels.
+- Energy storage battery banks.
+- Power routing conduits.
+- Breaker boxes and relay switches.
+- Displays showing power draw by system:
+  - Engines.
+  - Life support.
+  - Warp core.
+  - Interior lights.
+  - Shields/defense if included.
+  - Science lab.
+- Optional interactive power rerouting:
+  - Player can shift power between systems using a simple UI or wall switches.
+- Glowing energy lines and warning indicators for high-voltage areas.
+
+---
+
+## 20. Interactive Environmental Elements
+
+Make the ship feel alive by adding many small interactive elements.
+
+Include:
+
+- Usable coffee station.
+- Functional lockers.
+- Openable cabinets.
+- Toggleable lights.
+- Interactive terminals.
+- Buttons and switches with visual/audio feedback.
+- Sliding doors with manual override buttons.
+- Laptops or tablets that display information.
+- Holographic displays.
+- Storage crates that open.
+- Beds the player can use.
+- Chairs the player can sit in.
+- Windows with smart-glass toggles.
+- Fuel valves and diagnostic screens.
+- Medical scanners.
+- Security consoles.
+- Suit terminal.
+- Airlock cycle controls.
+- Warp lever and safety cover.
+- Dashboard target selector.
+- Acceleration button under safety lid.
+
+The interactions should be clear, responsive, and consistent.
+
+---
+
+## 21. First-Person Controls and Movement
+
+The game must support clean, comfortable first-person exploration.
+
+Required movement controls:
+
+- WASD movement.
+- Mouse look.
+- Jump.
+- Sprint.
+- Crouch if possible.
+- Interact key.
+- Sit/stand interaction.
+- Optional flashlight or helmet light.
+- Optional zoom/inspect mode.
+
+Movement requirements:
+
+- Smooth acceleration and deceleration.
+- Proper gravity inside the ship.
+- Stable camera height.
+- No camera clipping through walls or props.
+- Collision detection for all walkable areas.
+- Player should be able to move through every doorway without getting stuck.
+- Doorways should have clean clearance.
+- Props should not block critical paths.
+- Ramps and stairs should be walkable.
+- Sitting in chairs and seats should use smooth camera transitions.
+
+---
+
+## 22. Controls Display Rules
+
+Do not show permanent on-screen keybinds or control hints.
+
+Controls behavior:
+
+- When the player first enters the ship, show a clean controls explanation panel once.
+- After dismissal, do not show controls again automatically.
+- The player can reopen the controls explanation at any time from the Settings panel.
+- Optional contextual interaction prompts may appear near interactable objects, such as “Interact”, “Open”, “Sit”, “Pull Lever”, but avoid clutter.
+- The UI should feel sci-fi, minimal, and immersive.
+
+---
+
+## 23. Space Flight System
+
+When the player sits in the pilot seat, the game should switch to ship flight mode.
+
+Required flight features:
+
+- First-person cockpit view by default.
+- Optional third-person chase camera.
+- Optional cinematic orbital camera.
+- Full 6-DOF flight:
+  - Pitch.
+  - Yaw.
+  - Roll.
+  - Throttle.
+  - Boost.
+  - Reverse.
+  - Dampeners.
+- Smooth flight damping.
+- Optional flight assist mode to stabilize the ship.
+- HUD or dashboard indicators for:
+  - Speed.
+  - Orientation.
+  - Target lock.
+  - Thrust level.
+  - Fuel.
+  - Hull status.
+  - Warp readiness.
+  - Gravity/orbit status.
+- Ship handling should feel responsive but weighty.
+- The ship should not feel like an arcade fighter unless desired; prioritize a cinematic space-exploration feel.
+- Camera motion should be smooth and non-nauseating.
+- Space flight should allow the player to fly around the local solar system and approach planets/moons.
+
+---
+
+## 24. Celestial Environment and Solar System
+
+Create a multi-body solar system.
+
+Include:
+
+- A central dynamic Sun.
+- Volumetric lens flare.
+- Corona rays.
+- Animated solar surface shader if possible.
+- Realistic dynamic lighting reflecting off the ship’s metallic hull.
+- Multiple distinct planets.
+- Moons orbiting at least some planets.
+- Visible orbital paths.
+- Optional asteroid belts.
+- Optional gas giants with rings.
+- Optional comets or debris fields.
+- Each planet/moon should have a distinct color palette and identity.
+
+The solar system should be explorable enough for the player to lock onto destinations.
+
+---
+
+## 25. Interactive Target Selector
+
+Add an interactive target selector on the dashboard and/or holographic navigation display.
+
+Include:
+
+- Ability to lock onto planets.
+- Ability to lock onto moons.
+- Ability to lock onto space coordinates if needed.
+- Target distance display.
+- Target name display.
+- Estimated warp travel readiness.
+- Ability to set the selected target as the warp destination.
+- Clear confirmation before warp.
+- Optional autopilot alignment to target.
+
+The target selector should be usable from the cockpit dashboard and/or the holographic solar system display.
+
+---
+
+## 26. Warp Jump Sequence
+
+The warp jump should be a major cinematic moment.
+
+The sequence should happen as follows:
+
+### Step 1: Warp Preparation
+- Player selects a target destination.
+- Warp core becomes available.
+- Dashboard or engine room displays warp readiness.
+- Fuel requirement is checked.
+- Optional safety confirmation appears.
+
+### Step 2: Warp Core Spin-Up
+- The warp core begins spinning up.
+- Particle effects increase.
+- Energy pipes glow brighter.
+- Audio hum rises in pitch and intensity.
+- Screen shake begins subtly.
+- Interior lights may flicker or pulse.
+- Dashboard displays charging percentage or energy buildup.
+
+### Step 3: Lever Activation
+- Player opens the red safety switch cover.
+- Player pulls the physical warp lever.
+- The warp tunnel activates.
+
+### Step 4: Warp Tunnel
+- Animated hyperspace distortion shader.
+- Light streaks.
+- Motion blur.
+- Chromatic aberration if appropriate.
+- Speed sense increasing rapidly.
+- Audio transition from core hum to warp travel roar/whoosh.
+- Camera vibration and FOV shift.
+
+### Step 5: Warp Exit
+- The ship exits warp smoothly.
+- The target alien jungle planet appears ahead.
+- The ship is placed into a stable orbit or approach vector around the target planet.
+- Dashboard updates to show arrival complete.
+- Warp core cools down.
+
+The warp sequence should feel powerful, deliberate, and immersive.
+
+---
+
+## 27. Atmospheric Entry and Planetary Landing
+
+After warp exit, the player should be able to enter the planet’s atmosphere and land.
+
+### Re-Entry Sequence
+
+Include:
+
+- Seamless descent into the planet’s atmosphere.
+- Atmospheric compression fire/plasma hull shader.
+- Heat glow around the ship.
+- Camera shake scaled to entry intensity.
+- Audio transition from space silence to atmospheric roar.
+- Cloud canopy breakthrough.
+- Sky color transition from space black to atmospheric color.
+- Dynamic transition to ground-level landing.
+- No hard loading screen if possible.
+- If loading is required, disguise it inside the cinematic entry sequence.
+
+### Landing Dynamics
+
+Include:
+
+- Player can deploy landing gear.
+- Landing gear animation should be smooth and visible in third-person view.
+- Thruster flare during final descent.
+- Dust-ring shockwave effect upon touchdown.
+- Ground contact sound and subtle camera shake.
+- Ship stabilizes after landing.
+- Engines power down to idle.
+- Exterior environment becomes active.
+- Player can then stand up from the pilot seat and walk to the airlock/ramp.
+
+Landing should feel satisfying and cinematic.
+
+---
+
+## 28. Exit Ship and Surface Exploration
+
+After landing:
+
+- The player can leave the pilot seat.
+- Walk through the ship interior.
+- Reach the cargo bay/airlock ramp.
+- Lower the rear boarding hatch/ramp.
+- Step down onto the planetary surface in first-person mode.
+- The surface must be walkable and collision-safe.
+- The ship should sit naturally on the terrain.
+- The ramp should not clip into the ground.
+- The player should be able to turn around and see the ship from outside.
+- The ship exterior should be fully visible and detailed enough to feel believable.
+
+---
+
+## 29. Procedural Alien Jungle Planet Surface
+
+Create a procedural alien jungle planet surface that the player can explore on foot.
+
+### Biome Style
+
+The planet should feel vibrant, saturated, alien, and ancient.
+
+Include:
+
+- Dense alien vegetation.
+- Large glowing plants.
+- Bioluminescent flora.
+- Tall fern-like plants.
+- Alien flowers.
+- Hanging vines.
+- Moss-covered rocks.
+- Giant ancient trees.
+- Twisting roots.
+- Alien grass.
+- Strange fungi.
+- Colorful ground detail.
+- Rocky outcrops.
+- Steep hills or gentle terrain variation.
+- Clear pathways for traversal while still feeling natural.
+
+### Ancient Ruins
+
+Include:
+
+- Alien stone ruins.
+- Monoliths.
+- Broken arches.
+- Carved pillars.
+- Mysterious symbols.
+- Overgrown structures.
+- Optional subtle ruin lighting or emissive markings.
+
+### Waterfall and Glowing Pool
+
+Include:
+
+- A cascading waterfall.
+- The waterfall drains into a glowing emissive pool.
+- Animated water shader.
+- Reflective or emissive pool surface.
+- Mist particles near the waterfall.
+- Ambient water sound.
+- The pool should serve as a visual landmark.
+
+### Atmosphere
+
+Include:
+
+- Volumetric god rays penetrating through the canopy.
+- Floating glowing spore particles.
+- Drifting pollen or firefly-like particles.
+- Dynamic ambient lighting.
+- Soft fog near the ground or between trees.
+- Rich alien sky color.
+- Visible sun or local star in the sky.
+- Optional distant moons or rings visible in the sky.
+- Wind movement in foliage if possible.
+- Environmental motion to make the jungle feel alive.
+
+---
+
+## 30. Surface Collision and Traversal
+
+The planetary surface must be cleanly traversable.
+
+Requirements:
+
+- Accurate terrain collision.
+- Player can walk over hills, rocks, roots, and paths.
+- No falling through the terrain.
+- No invisible walls unless absolutely necessary.
+- Trees, rocks, ruins, and major props should have collision.
+- Small decorative grass/foliage should not block movement.
+- The player can climb gentle slopes.
+- Slopes that are too steep should be naturally blocked or made walkable through path design.
+- Collision around trees and rocks should be precise enough to avoid clipping.
+- The player should be able to walk away from the ship, explore nearby points of interest, and return safely.
+
+Optional but recommended:
+
+- Sprint on surface.
+- Jump on surface.
+- Footstep audio matching surface materials.
+- Subtle head bob.
+- Helmet/suit audio filter if EVA suit is active.
+
+---
+
+## 31. Exterior Ship Model
+
+The ship must have a complete exterior model.
+
+Include:
+
+- Metallic hull with PBR materials.
+- Visible cockpit window from outside.
+- Engine thrusters.
+- Landing gear.
+- Cargo ramp/boarding hatch.
+- Antennas and sensors.
+- Panel lines and hull details.
+- Subtle wear, scratches, or decals if possible.
+- Running lights and landing lights.
+- Thruster glow during flight and landing.
+- Reflection of the sun and environment on the hull.
+- Heat/re-entry shader when entering atmosphere.
+
+The exterior ship model should match the interior scale and exit points logically.
+
+---
+
+## 32. Visual Style and Rendering
+
+The game should look polished and immersive.
+
+Recommended visual features:
+
+- Physically based rendering if possible.
+- Dynamic lighting.
+- Emissive materials.
+- Bloom for glowing elements.
+- Tone mapping.
+- Soft shadows.
+- Ambient occlusion if performance allows.
+- Reflections where feasible.
+- Volumetric light for sun rays and interior dust/atmosphere.
+- Particle effects for:
+  - Warp core.
+  - Engine exhaust.
+  - Atmospheric re-entry.
+  - Landing dust.
+  - Alien spores.
+  - Waterfall mist.
+- Smooth camera transitions.
+- Cinematic framing during warp and landing.
+- Clean, readable UI.
+- Sci-fi fonts and minimal HUD design.
+
+---
+
+## 33. Audio Design
+
+Use procedural audio synthesis where possible, supplemented by external audio assets if needed.
+
+Required audio systems:
+
+### Ship Interior Audio
+- Low ambient engine hum.
+- Air circulation noise.
+- Footsteps on different interior materials.
+- Door sliding/hydraulic sounds.
+- Button and switch clicks.
+- Console beeps.
+- Locker/cabinet opening sounds.
+- Suit-up terminal sounds.
+- Coffee/beverage dispenser sounds.
+- Warp core spin-up hum.
+- Lever pull mechanical sound.
+
+### Space Flight Audio
+- Engine thrust loop.
+- Thruster boost sound.
+- Cockpit interior sound.
+- Subtle vibration/rumble during acceleration.
+- Warp tunnel sound.
+- Target lock beep.
+- Dashboard warning/notification sounds.
+
+### Atmospheric Entry Audio
+- Wind/plasma roar.
+- Hull heating crackle.
+- Thruster flare during landing.
+- Landing gear deployment sound.
+- Touchdown impact sound.
+- Dust shockwave sound.
+
+### Planet Surface Audio
+- Alien forest ambient soundscape.
+- Wind through foliage.
+- Distant exotic animal calls or mysterious ambient tones.
+- Waterfall sound.
+- Footsteps on grass, rock, moss, roots, and stone.
+- Particle/spore shimmer sound if appropriate.
+- Subtle low-frequency environmental rumble.
+
+Audio should be immersive, layered, and responsive to player actions.
+
+---
+
+## 34. UI and Menus
+
+Create a clean, minimal, sci-fi UI.
+
+Include:
+
+- Main menu:
+  - Start.
+  - Settings.
+  - Controls.
+  - Credits.
+  - Quit.
+- Settings panel:
+  - Graphics quality.
+  - Resolution/fullscreen if applicable.
+  - Mouse sensitivity.
+  - Audio volume.
+  - Toggle controls display.
+- Controls screen:
+  - Shown once when player first enters ship.
+  - Reopenable from Settings.
+- Pause menu.
+- Interaction prompts.
+- Target selection display.
+- Warp status display.
+- Landing gear status.
+- Optional mission/objective log.
+
+Do not overcrowd the screen with UI. The experience should feel immersive.
+
+---
+
+## 35. Gameplay Flow
+
+The required gameplay loop is:
+
+1. Player starts inside the starship.
+2. Player explores the ship interior.
+3. Player sees controls once.
+4. Player reaches the cockpit/bridge.
+5. Player sits in the pilot seat.
+6. Player opens the safety lid and activates acceleration/throttle.
+7. Player flies the ship in space.
+8. Player uses the target selector or holographic navigation to select a destination.
+9. Player prepares the warp drive.
+10. Player goes to the engine room or uses dashboard warp controls.
+11. Player opens the red safety cover and pulls the warp lever.
+12. Warp core spins up.
+13. Warp jump begins.
+14. Ship exits warp near the alien jungle planet.
+15. Player enters the atmosphere.
+16. Player lands on the surface.
+17. Player stands up from the pilot seat.
+18. Player walks to the cargo bay/airlock ramp.
+19. Player lowers the ramp.
+20. Player steps onto the alien jungle planet.
+21. Player explores the surface, waterfall, ruins, glowing pool, and vegetation.
+22. Player can return to the ship.
+
+This loop must be fully functional.
+
+---
+
+## 36. Technical Requirements
+
+The implementation should be stable, modular, and optimized.
+
+### If Browser-Based
+Use:
+
+- TypeScript or clean modular JavaScript.
+- WebGL or WebGPU.
+- A modular file/package structure.
+- No unnecessary giant single-file codebase unless required.
+- Clean separation of:
+  - Rendering.
+  - Input.
+  - Player controller.
+  - Ship interior logic.
+  - Space flight system.
+  - Warp system.
+  - Planet generation.
+  - Audio.
+  - UI.
+  - Asset loading.
+
+### If Custom Engine
+Use:
+
+- C++ or another traditional game-engine language.
+- OpenGL, Vulkan, or DirectX.
+- Appropriate libraries for:
+  - Window/input: SDL2, GLFW, or similar.
+  - Math: GLM or custom math library.
+  - Model loading: Assimp or similar.
+  - Audio: OpenAL, FMOD, or similar.
+  - Texture loading: stb_image or similar.
+
+### Assets
+Use downloaded 3D models and external textures where appropriate.
+
+Possible asset categories:
+
+- Sci-fi corridor kits.
+- Cockpit consoles.
+- Pilot seats.
+- Storage crates.
+- Medical equipment.
+- Laboratory props.
+- Tools.
+- EVA suits.
+- Space rocks.
+- Alien vegetation.
+- Ancient ruins.
+- Waterfall/rock meshes.
+- PBR metal textures.
+- PBR panel textures.
+- Space skyboxes.
+- Planet surface textures.
+
+All external assets must be legally usable and credited.
+
+---
+
+## 37. Performance Requirements
+
+Target 60 FPS on a modern mid-range machine if possible.
+
+Use optimizations such as:
+
+- Efficient procedural geometry.
+- Mesh instancing for repeated props.
+- Instanced vegetation.
+- Frustum culling.
+- Occlusion culling where possible.
+- LODs for planets, vegetation, and ship props.
+- Shader LODs or simplified materials for distant objects.
+- Texture atlasing where useful.
+- Object pooling for particles and effects.
+- Chunk-based terrain for planet surface.
+- Collision meshes simplified from render meshes.
+- Limiting real-time lights.
+- Baked lighting where possible.
+- Optimized particle systems.
+- Smooth loading or streaming where necessary.
+
+The game should not freeze, crash, or block the player during major transitions.
+
+---
+
+## 38. Polish and Immersion Details
+
+Add extra polish wherever possible:
+
+- Subtle camera shake near the warp core and during re-entry.
+- Animated blinking console lights.
+- Dust particles in light shafts.
+- Footstep variation by material.
+- Door state sounds.
+- Seat sit/stand camera easing.
+- Hologram flicker.
+- Button press depth.
+- Lever pull physicality.
+- Landing dust reacting to thruster angle.
+- Sun glare through cockpit glass.
+- Interior reflections on visors/screens.
+- Ambient ship creaking during flight.
+- Planet surface wind gusts.
+- Glowing pool reflections.
+- Ruin emissive pulse.
+- Warp tunnel chromatic distortion.
+- Smooth fade transitions between major game states.
+
+---
+
+## 39. Save System
+
+Include a simple save system if possible.
+
+At minimum:
+
+- Save current game state.
+- Save whether the ship is in space, warp, orbit, or landed.
+- Save player location.
+- Save selected warp target.
+- Save important toggled objects if reasonable.
+
+If a full save system is too complex, include a lightweight checkpoint or resume state.
+
+---
+
+## 40. Debug and Development Features
+
+Include optional debug features if helpful:
+
+- Debug menu.
+- Teleport to major rooms.
+- Toggle noclip.
+- Toggle FPS counter.
+- Toggle collision.
+- Skip warp sequence.
+- Skip landing sequence.
+- Toggle wireframe.
+- Asset credit viewer.
+
+Debug features should be disabled or hidden in the final presentation unless requested.
+
+---
+
+## 41. Final Deliverable
+
+The final result should be a fully playable game or game prototype that includes:
+
+- A complete starship interior.
+- First-person exploration.
+- Pilot seat flight interaction.
+- Space flight.
+- Solar system navigation.
+- Warp jump sequence.
+- Atmospheric entry.
+- Planetary landing.
+- Exterior ship.
+- Cargo ramp exit.
+- Procedural alien jungle planet.
+- Surface exploration.
+- Procedural or layered audio.
+- Clean controls handling.
+- Settings menu with controls.
+- Stable performance.
+- External asset credits if used.
+
+The experience should feel like a cohesive sci-fi exploration game, not a collection of disconnected scenes. Prioritize playability, immersion, smooth transitions, and clean collision above all.
+
+### 1.0 ASSET PIVOT NORMALIZATION, BOUNDING BOX ALIGNMENT & GROUND CLAMPING (ZERO-FLOAT DIRECTIVE)
+
+To eliminate common AI-generation defects (such as floating props, misaligned centers, offset pivot origins, or meshes buried halfway into surfaces), the engine must run an automated **Geometry Alignment & Surface Snapping Pipeline** for every single placed object, prop, and interior furniture piece before rendering:
+
+1. **Automated Pivot Center & Origin Normalization**:
+   - For every 3D mesh asset (procedural or imported glTF/GLB), compute its local Axis-Aligned Bounding Box (AABB) dynamically:
+     ```typescript
+     geometry.computeBoundingBox();
+     const bbox = geometry.boundingBox;
+     const size = new Vector3();
+     const center = new Vector3();
+     bbox.getSize(size);
+     bbox.getCenter(center);
+     ```
+   - **Pivot Calibration Rules**:
+     - **Floor-Mounted / Surface Props** (Chairs, Desks, Laptops, Cups, Beds, Trees, Monoliths, Crates): Automatically re-center the $X$ and $Z$ axes to the true bounding box center ($0.0$), but offset the local $Y$ origin to the **absolute bottom** of the mesh ($Y_{\text{origin}} = \text{bbox.min.y}$). This ensures the origin point $(0, 0, 0)$ is flush with the contact surface.
+     - **Wall-Mounted Assets** (Screens, PDLC Windows, Wall Racks, Light Fixtures): Set the back surface of the bounding box to $Z_{\text{origin}} = \text{bbox.max.z}$ (or flush plane) so the asset snaps flat against the wall normal without clipping inside walls or hovering in air.
+     - **Ceiling Assets & Light Panels**: Set the top surface of the bounding box to $Y_{\text{origin}} = \text{bbox.max.y}$ to guarantee seamless ceiling-recess alignment.
+     - **Floating / Dynamic Kinetic Items** (Hologram, Space Dust, Spinning Warp Core): Maintain true geometric volumetric centroid:
+       $$\mathbf{C} = \frac{1}{2} (\mathbf{P}_{\text{min}} + \mathbf{P}_{\text{max}})$$
+
+2. **Automated Surface Snapping (Raycast Surface Clamp)**:
+   - When placing any object on floors, desks, shelves, or planetary terrain:
+     - Cast a downward vertical test ray from the spawn coordinate:
+       $$\text{Ray}_{\text{snap}}(\mathbf{O}, \mathbf{D}) \quad \text{where} \quad \mathbf{D} = (0, -1, 0)$$
+     - Align the bottom origin ($Y_{\text{bottom}} = 0$) directly to the raycast hit point:
+       $$Y_{\text{prop}} = Y_{\text{hit\_surface}} + \epsilon \quad (\text{where } \epsilon = 0.001\text{m to prevent Z-fighting})$$
+     - If the terrain has a slope, rotate the object's Up-vector $\mathbf{u}$ to align with the surface normal vector $\mathbf{n}$:
+       $$\mathbf{q}_{\text{rot}} = \text{Quaternion.FromToRotation}(\mathbf{u}_{\text{up}}, \mathbf{n}_{\text{surface}})$$
+
+3. **Collision Hull Conformity**:
+   - Generate invisible simplified primitive colliders (BoxCollider, CapsuleCollider, or ConvexHull) directly from the normalized bounding box.
+   - The bottom plane of the collider must perfectly match the bottom plane of the visual mesh ($Y_{\text{min\_collider}} \equiv Y_{\text{min\_mesh}}$) so the player's camera and feet physically walk on top of surfaces without floating in mid-air or sinking into geometry.
+
+
+### 1.0.1 PROFESSIONAL UI/UX BENCHMARK RESEARCH & DIEGETIC INTERFACE SYSTEM (ANTI-SLOP DIRECTIVE)
+
+Do not generate generic, placeholder, or flat "AI-slop" UI overlays (e.g., raw centered rectangles, neon blue gradients with generic sans-serif fonts, or floating clutter covering gameplay). 
+
+Before writing any HUD or menu code, systematically align the UI architecture with professional AAA sci-fi game interface benchmarks (*Star Citizen* mobiGlas, *Elite Dangerous* holographic cockpits, *Dead Space* diegetic suit projections, and *Alien: Isolation* retro-industrial CRTs):
+
+1. **Pre-Design Architectural Research & Benchmarking**:
+   - **Cockpit Avionics**: Research modern military HUD collimation (infinity-focus projection), pitch ladders, velocity prograde/retrograde markers, and integrated MFDs (Multi-Function Displays) angled along the cockpit dashboard's physical geometry.
+   - **Player Status & Menus**: Research in-world diegetic UI (wrist-mounted holographic slates, physical tablet slates held in hands, and wall-mounted tactile screens) rather than flat static 2D screen overlays.
+   - **Color Palette & Visual Hierarchy**:
+     * Primary Flight/Nav Data: High-contrast amber/gold (`#FFB000`) or crisp tactical cyan (`#00F0FF`) with subtle 5% additive glow bloom.
+     * Caution / Warnings: High-visibility hazard orange (`#FF6600`) and emergency red (`#FF2244`).
+     * Background Panels: Low-opacity dark obsidian glass (`rgba(10, 15, 22, 0.75)`) with subtle 1px brushed-metal borders (`#1F3347`) and backdrop blur (12px blur filter).
+
+2. **Diegetic & Spatial Interface Engineering**:
+   - **Zero Flat Screen Overlays in Exploration**: When walking around the ship or planetary surface, 0% of the screen is blocked by static 2D health bars or floating objective markers.
+   - **Interactive World-Space UI (3D In-Engine Canvases)**:
+     * Door panels, life-support terminals, reactor breakers, and coffee machines must use high-resolution world-space canvas textures rendered directly onto the 3D surface geometry with reactive hover states.
+     * Pressing an interaction key snaps the player's focus smoothly toward the physical screen (subtle FOV zoom with depth-of-field background blur), maintaining full in-world immersion.
+   - **Cockpit Collimated Projection**: The flight HUD must be mapped to a true parallax collimated shader—when the pilot moves their head (G-force or mouse look), the HUD reticle remains locked to target vectors in infinite space rather than sliding on the windshield glass.
+
+3. **Typography, Layout & Micro-Interactions**:
+   - **Typography System**: Use clean, monospaced or technical geometric typefaces (e.g., *Share Tech Mono*, *Orbitron*, *Rajdhani*, or *DIN Pro* equivalents) with strict typographic scale (Header: 14pt bold, Subhead: 11pt medium, Telemetry Data: 9pt mono).
+   - **Dynamic Data Visualization**: All numbers (speed, fuel, altitude, shield %) must dynamically roll/tick smoothly with physics updates instead of snapping abruptly.
+   - **Tactile Audio-Visual Feedback**: Every button, lever, and toggle must feature a complete 3-state tactile loop:
+     1. *Hover*: Subtle 1px edge highlight + high-pitch micro-click tone (1200 Hz).
+     2. *Depress*: 2mm physical mesh translation / active state color shift + heavy mechanical switch clunk.
+     3. *Release/Engage*: Confirm chime / animated progress indicator fill.
+
+
+---
