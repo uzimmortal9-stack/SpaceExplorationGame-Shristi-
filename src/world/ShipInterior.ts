@@ -5,6 +5,7 @@ import type { CollisionSystem } from './CollisionSystem';
 import type { AudioEngine } from '../core/AudioEngine';
 import type { AmbientSystem } from '../systems/AmbientSystem';
 import type { DoorSystem } from '../systems/DoorSystem';
+import type { Animator } from '../core/Animator';
 import { PropFactory } from './PropFactory';
 import { RoomBuilder } from './RoomBuilder';
 import { normalizedBox, normalizedCylinder } from './geometryAlignment';
@@ -53,6 +54,7 @@ export class ShipInterior {
   private collision: CollisionSystem;
   private callbacks: ShipInteriorCallbacks;
   private ambient: AmbientSystem;
+  private animator: Animator;
   private statusPanel!: WorldPanel;
   private navPanel!: WorldPanel;
   private throttleLid!: THREE.Mesh;
@@ -77,6 +79,7 @@ export class ShipInterior {
     audio: AudioEngine,
     ambient: AmbientSystem,
     doors: DoorSystem,
+    animator: Animator,
     callbacks: ShipInteriorCallbacks,
   ) {
     this.root.name = 'CSV Astraea Interior';
@@ -84,7 +87,8 @@ export class ShipInterior {
     this.collision = collision;
     this.callbacks = callbacks;
     this.ambient = ambient;
-    this.props = new PropFactory(interaction, ambient, {
+    this.animator = animator;
+    this.props = new PropFactory(interaction, ambient, animator, {
       toast: callbacks.toast,
       suitChanged: callbacks.onSuitChanged,
     });
@@ -550,10 +554,16 @@ export class ShipInterior {
       onInteract: () => {
         if (!this.callbacks.canWarp()) this.callbacks.toast('WARP INHIBITED // SELECT AND LOCK DESTINATION');
         else {
-          this.warpLever.rotation.x = -0.72;
+          this.pullLever(this.warpLever, 'cockpit:warp-lever');
           this.callbacks.onWarpLever();
         }
       },
+    });
+  }
+
+  private pullLever(lever: THREE.Group, key: string): void {
+    this.animator.tween(lever, key, { rotation: new THREE.Euler(-0.85, 0, 0, lever.rotation.order) }, 0.32, undefined, () => {
+      this.animator.tween(lever, key, { rotation: new THREE.Euler(0, 0, 0, lever.rotation.order) }, 0.9);
     });
   }
 
@@ -589,8 +599,15 @@ export class ShipInterior {
       onHover: (active) => roomCover.scale.setScalar(active ? 1.025 : 1),
       onInteract: () => {
         this.warpCoverOpen = !this.warpCoverOpen;
-        roomCover.rotation.x = this.warpCoverOpen ? -1.15 : 0;
-        roomCover.position.z = this.warpCoverOpen ? 1.52 : 1.8;
+        this.animator.tween(
+          roomCover,
+          'warp-room:cover',
+          {
+            rotation: new THREE.Euler(this.warpCoverOpen ? -1.25 : 0, 0, 0, roomCover.rotation.order),
+            position: new THREE.Vector3(roomCover.position.x, roomCover.position.y, this.warpCoverOpen ? 1.5 : 1.8),
+          },
+          0.45,
+        );
         this.callbacks.onWarpCover(this.warpCoverOpen);
         this.callbacks.toast(this.warpCoverOpen ? 'ENGINE-ROOM WARP INTERLOCK OPEN' : 'ENGINE-ROOM WARP INTERLOCK SAFE');
       },
@@ -601,7 +618,7 @@ export class ShipInterior {
       onHover: (active) => duplicateLever.scale.setScalar(active ? 1.05 : 1),
       onInteract: () => {
         if (this.callbacks.canWarp()) {
-          duplicateLever.rotation.x = -0.72;
+          this.pullLever(duplicateLever, 'warp-room:lever');
           this.callbacks.onWarpLever();
         } else this.callbacks.toast('WARP INHIBITED // COORDINATES UNSET');
       },

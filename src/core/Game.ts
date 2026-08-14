@@ -3,10 +3,12 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 import type { GameMode, GameSettings, GameSnapshot } from '../types';
 import { Input } from './Input';
 import { AudioEngine } from './AudioEngine';
 import { SaveSystem } from './SaveSystem';
+import { Animator } from './Animator';
 import { CollisionSystem } from '../world/CollisionSystem';
 import { InteractionSystem } from '../world/InteractionSystem';
 import { AmbientSystem } from '../systems/AmbientSystem';
@@ -19,7 +21,9 @@ import { PlanetSurface } from '../world/PlanetSurface';
 import { FlightSystem } from '../systems/FlightSystem';
 import { WarpSystem, type WarpPhase } from '../systems/WarpSystem';
 import { EntryLandingSystem, type EntryPhase } from '../systems/EntryLandingSystem';
+import { CinematicDirector, type DirectorShot } from '../systems/CinematicDirector';
 import { UIManager, type UIActions } from '../ui/UIManager';
+import { loadEnvironment } from '../world/AssetLibrary';
 import { easeInOutCubic } from './Tween';
 
 interface CameraTransition {
@@ -40,6 +44,7 @@ export class Game {
   readonly saves = new SaveSystem();
   readonly collision = new CollisionSystem();
   readonly ambient = new AmbientSystem();
+  readonly animator = new Animator();
   readonly ui: UIManager;
   readonly player: PlayerController;
   readonly interior: ShipInterior;
@@ -49,6 +54,7 @@ export class Game {
   readonly flight: FlightSystem;
   readonly warp: WarpSystem;
   readonly entry: EntryLandingSystem;
+  readonly director = new CinematicDirector();
   mode: GameMode = 'MENU';
   settings: GameSettings;
   seated = false;
@@ -78,6 +84,7 @@ export class Game {
   private surfaceEntered = false;
   private poolDiscovered = false;
   private ruinsDiscovered = false;
+  private missionResolved = false;
 
   constructor(canvas: HTMLCanvasElement, uiRoot: HTMLElement) {
     this.canvas = canvas;
@@ -92,10 +99,11 @@ export class Game {
     this.scene.add(this.player.rig);
 
     this.scene.background = new THREE.Color(0x010307);
-    this.scene.add(new THREE.AmbientLight(0x8bb6c5, 0.72));
+    this.scene.add(new THREE.AmbientLight(0x94b7c9, 0.32));
+    this.scene.add(new THREE.HemisphereLight(0x7fa6c9, 0x1a2320, 0.22));
     this.buildInteriorLighting();
 
-    this.interior = new ShipInterior(this.interaction, this.collision, this.audio, this.ambient, this.doors, {
+    this.interior = new ShipInterior(this.interaction, this.collision, this.audio, this.ambient, this.doors, this.animator, {
       toast: (message) => this.ui.toast(message),
       onSitPilot: () => this.sitInPilotSeat(),
       onCycleTarget: () => this.cycleTarget(),
@@ -143,10 +151,36 @@ export class Game {
     this.ui.showMain(this.saves.hasSave());
     this.ui.fade(true, true);
     this.running = true;
+    void this.prepareAssets();
     requestAnimationFrame(this.animate);
     requestAnimationFrame(() => {
       this.ui.fade(false);
     });
+  }
+
+  /**
+   * Loads the CC0 HDRI environments used for image-based lighting and
+   * reflections, then assigns the neutral studio rig for the interior. Runs in
+   * the background so the menu is interactive while assets stream in.
+   */
+  private async prepareAssets(): Promise<void> {
+    try {
+      this.scene.environment = await loadEnvironment(this.renderer, 'studio');
+      this.scene.environmentIntensity = 0.85;
+      // Pre-warm the jungle environment for a seamless landing swap.
+      void loadEnvironment(this.renderer, 'forest');
+    } catch {
+      // Environment mapping is a polish pass; the game remains playable without it.
+      this.scene.environment = null;
+    }
+  }
+
+  private async setEnvironment(name: 'studio' | 'forest'): Promise<void> {
+    try {
+      this.scene.environment = await loadEnvironment(this.renderer, name);
+    } catch {
+      this.scene.environment = null;
+    }
   }
 
   private configureRenderer(): void {
@@ -161,18 +195,47 @@ export class Game {
   }
 
   private buildInteriorLighting(): void {
-    for (let z = -56; z <= 68; z += 16) {
-      const light = new THREE.PointLight(z > 35 ? 0xffb36d : z > -4 && z < 17 ? 0xffd6a3 : 0x8eeaff, 5.8, 23, 1.55);
-      light.position.set(0, 2.75, z);
-      this.scene.add(light);
+    RectAreaLightUniformsLib.init();
+
+    // Central corridor: soft rectangular ceiling panels cast a clean down-light.
+    for (let z = -56; z <= 68; z += 10) {
+      const warm = z > 30 || (z > -6 && z < 18);
+      const area = new THREE.RectAreaLight(warm ? 0xffd9a3 : 0x9fdcff, warm ? 4.2 : 5.2, 2.1, 1.4);
+      area.position.set(0, 3.02, z);
+      area.lookAt(0, 0, z);
+      this.scene.add(area);
     }
-    for (const x of [-9.5, 9.5]) {
+
+    // Side rooms get narrower cool/warm strips matching their role.
+    for (const x of [-9.25, 9.25]) {
       for (let z = -40; z <= 56; z += 24) {
-        const light = new THREE.PointLight(z > 17 ? 0xffa557 : 0x88dfff, 3.8, 15, 1.7);
-        light.position.set(x, 2.65, z);
-        this.scene.add(light);
+        const warm = z > 14;
+        const area = new THREE.RectAreaLight(warm ? 0xffc790 : 0x8fdcff, warm ? 3.4 : 4.1, 1.5, 1.1);
+        area.position.set(x, 2.98, z);
+        area.lookAt(x * 0.55, 0, z);
+        this.scene.add(area);
       }
     }
+
+    // Bridge: key light over the dashboard plus a cool rim on the console row.
+    const dashSpot = new THREE.SpotLight(0xbfeaff, 60, 16, 0.52, 0.5, 1.4);
+    dashSpot.position.set(0, 3.25, -57.4);
+    dashSpot.target.position.set(0, 0.4, -61.2);
+    this.scene.add(dashSpot, dashSpot.target);
+    const consoleFill = new THREE.SpotLight(0x9fe0ff, 32, 18, 0.75, 0.55, 1.6);
+    consoleFill.position.set(0, 2.7, -59.5);
+    consoleFill.target.position.set(0, 1.1, -63.6);
+    this.scene.add(consoleFill, consoleFill.target);
+
+    // Cargo bay / airlock: broad cool wash with a warm accent at the ramp.
+    const cargoFill = new THREE.RectAreaLight(0xbfe4ff, 4.6, 5, 3.2);
+    cargoFill.position.set(0, 4.1, 70);
+    cargoFill.lookAt(0, 0, 70);
+    this.scene.add(cargoFill);
+    const rampAccent = new THREE.SpotLight(0xffc37a, 40, 15, 0.6, 0.5, 1.5);
+    rampAccent.position.set(0, 4.0, 74);
+    rampAccent.target.position.set(0, 0, 77.5);
+    this.scene.add(rampAccent, rampAccent.target);
   }
 
   private createUIActions(): UIActions {
@@ -282,6 +345,7 @@ export class Game {
     this.surfaceEntered = false;
     this.poolDiscovered = false;
     this.ruinsDiscovered = false;
+    this.missionResolved = false;
     this.cameraTransition = null;
     this.player.rig.add(this.player.camera);
     this.player.camera.position.set(0, 1.68, 0);
@@ -294,6 +358,7 @@ export class Game {
     this.space.setVisible(true);
     this.surface.setVisible(false);
     this.audio.setEnvironment('ship');
+    void this.setEnvironment('studio');
   }
 
   private sitInPilotSeat(): void {
@@ -379,6 +444,7 @@ export class Game {
     }
     this.mode = 'WARP_CHARGE';
     this.suppressInteraction = true;
+    this.flight.cameraMode = 'chase';
     this.flight.fuel = Math.max(0, this.flight.fuel - this.space.targets[this.targetIndex].fuelCost);
     this.warp.start();
   }
@@ -428,18 +494,31 @@ export class Game {
       if (phase === 'plasma') this.ui.cinematic('ATMOSPHERIC INTERFACE', `HULL PLASMA // ALT ${Math.round(this.flight.altitude / 1000)} km`, progress);
       if (phase === 'clouds') this.ui.cinematic('CLOUD CANOPY', 'VISUAL RANGE LIMITED // AUTOPILOT HOLDING', progress);
       if (phase === 'gear-hold') this.ui.cinematic('LANDING GEAR REQUIRED', 'PRESS G TO DEPLOY // DESCENT PAUSED', this.flight.gearDeployed ? progress : 0);
-      if (phase === 'landing') this.ui.cinematic('FINAL DESCENT', `THRUSTER VECTORING // ALT ${Math.round(this.flight.altitude)} m`, progress);
+      if (phase === 'landing') {
+        // Reveal the planet and drive the visible ground approach so the ship
+        // reads as physically descending toward the surface.
+        if (!this.surface.visible) {
+          this.space.setVisible(false);
+          this.surface.setVisible(true);
+        }
+        const approach = 1 - Math.pow(1 - progress, 2.2);
+        this.surface.setDescent(-(1 - approach) * 520);
+        this.ui.cinematic('FINAL DESCENT', `THRUSTER VECTORING // ALT ${Math.round(this.flight.altitude)} m`, progress);
+      }
     };
     this.entry.onComplete = () => {
       this.ui.fade(true);
       this.landed = true;
       this.mode = 'LANDED';
       this.suppressInteraction = false;
+      this.flight.cameraMode = 'cockpit';
       this.flight.setActive(false);
       this.space.setVisible(false);
+      this.surface.setDescent(0);
       this.surface.setVisible(true);
       this.player.setSurface(true);
       this.audio.setEnvironment('jungle');
+      void this.setEnvironment('forest');
       this.ui.cinematic(null);
       window.setTimeout(() => this.ui.fade(false), 620);
       this.ui.toast('TOUCHDOWN // NEMORA IV // EXIT THROUGH AFT AIRLOCK', 5.5);
@@ -573,10 +652,12 @@ export class Game {
     this.flight.setActive(false);
     this.exterior.setGear(true);
     this.space.setVisible(false);
+    this.surface.setDescent(0);
     this.surface.setVisible(true);
     this.player.setSurface(true);
     this.interior.setRamp(true);
     this.audio.setEnvironment('jungle');
+    void this.setEnvironment('forest');
   }
 
   private onPointerLockChange = (): void => {
@@ -609,6 +690,7 @@ export class Game {
   private update(delta: number): void {
     this.ui.update(delta);
     this.audio.update(delta);
+    this.animator.update(delta);
     if (this.landed) this.audio.setSurfaceListener(this.player.position.x, this.player.position.z);
     this.ambient.update(delta, this.elapsed);
     this.interior.update(delta);
@@ -642,7 +724,7 @@ export class Game {
       if (this.debugOpen) this.input.releasePointerLock();
       else this.input.requestPointerLock();
     }
-    if (this.input.consume('Tab')) this.ui.toast(this.landed ? 'MISSION // LOCATE THE RESONANT RUINS BEYOND THE GLOWING POOL' : 'MISSION // SELECT NEMORA IV AND INITIATE WARP');
+    if (this.input.consume('Tab')) this.ui.toast(this.missionObjective(), 4.5);
 
     this.updateCameraTransition(delta);
     if (this.cameraTransition) return;
@@ -678,6 +760,35 @@ export class Game {
       this.flight.update(delta, this.entry.phase === 'gear-hold');
       this.entry.update(delta);
     }
+    this.frameDirector(delta);
+  }
+
+  /** Composes cinematic camera shots for warp and atmospheric entry/landing. */
+  private frameDirector(delta: number): void {
+    const chase = this.flight.chaseCamera;
+    let shot: DirectorShot | null = null;
+    let progress = 0;
+    if (this.warp.phase === 'charge') { shot = 'warp-charge'; progress = this.warp.progress; }
+    else if (this.warp.phase === 'tunnel') { shot = 'warp-tunnel'; progress = this.warp.progress; }
+    else if (this.warp.phase === 'exit') { shot = 'warp-exit'; progress = this.warp.progress; }
+    else if (this.entry.phase === 'plasma') { shot = 'entry-plasma'; progress = this.entry.progress; }
+    else if (this.entry.phase === 'clouds') { shot = 'entry-clouds'; progress = this.entry.progress; }
+    else if (this.entry.phase === 'gear-hold') { shot = 'entry-gear'; progress = this.flight.gearDeployed ? 1 : 0; }
+    else if (this.entry.phase === 'landing') { shot = 'entry-landing'; progress = this.entry.progress; }
+    if (shot) this.director.frame(chase, shot, progress, delta, this.settings.motion);
+  }
+
+  private missionObjective(): string {
+    if (this.missionResolved) return 'MISSION // TRANSMISSION SENT // RETURN TO THE ASTRAEA AND PREPARE DEPARTURE';
+    if (this.ruinsDiscovered) return 'MISSION // RESONATOR ALIGNED // RETURN TO THE SHIP TO RELAY THE SIGNAL';
+    if (this.poolDiscovered) return 'MISSION // FOLLOW THE RESONANCE TO THE RUINS BEYOND THE POOL';
+    if (this.surfaceEntered) return 'MISSION // TRACE THE VERDANT SIGNAL ALONG THE BIOLUMINESCENT PATH';
+    if (this.landed) return 'MISSION // EXIT THROUGH THE AFT AIRLOCK AND BEGIN SURFACE SURVEY';
+    if (this.entryReady) return 'MISSION // INITIATE ATMOSPHERIC ENTRY FROM THE ORBITAL SOLUTION DISPLAY';
+    if (this.targetLocked && this.flight.thrustArmed) return 'MISSION // OPEN THE RED COVER AND PULL THE WARP LEVER';
+    if (this.flight.thrustArmed) return 'MISSION // SELECT NEMORA IV ON THE CENTER NAVIGATION MFD';
+    if (this.seated) return 'MISSION // OPEN THE AMBER SAFETY LID, THEN ARM PRIMARY THRUST';
+    return 'MISSION // REACH THE BRIDGE AND BRING THE FLIGHT DECK ONLINE';
   }
 
   private updateSurfaceMission(): void {
@@ -695,7 +806,13 @@ export class Game {
     }
     if (!this.ruinsDiscovered && Math.hypot(x + 28, z - 137) < 13) {
       this.ruinsDiscovered = true;
-      this.ui.toast('MISSION COMPLETE // VERDANT SIGNAL SOURCE CONFIRMED // ANCIENT RESONATOR ONLINE', 8);
+      this.ui.toast('SIGNAL SOURCE CONFIRMED // ANCIENT RESONATOR ALIGNED WITH THE CASCADE', 8);
+      this.audio.confirm();
+      this.saveGame(false);
+    }
+    if (this.ruinsDiscovered && !this.missionResolved && z < 88 && Math.hypot(x, z - 80) < 26) {
+      this.missionResolved = true;
+      this.ui.toast('VERDANT SIGNAL RELAYED // NEMORA IV ANSWERS // MISSION COMPLETE', 9);
       this.audio.confirm();
       this.saveGame(false);
     }

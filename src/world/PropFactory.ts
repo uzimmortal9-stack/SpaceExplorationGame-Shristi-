@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { InteractionSystem } from './InteractionSystem';
 import type { AmbientSystem } from '../systems/AmbientSystem';
+import type { Animator } from '../core/Animator';
 import { normalizedBox, normalizedCylinder } from './geometryAlignment';
 import { COLORS, emissive, glass, matte, metal, shared } from './materials';
 import { WorldPanel } from './WorldPanel';
@@ -15,12 +16,14 @@ export class PropFactory {
   readonly toggles: Record<string, boolean> = {};
   private interaction: InteractionSystem;
   private ambient: AmbientSystem;
+  private animator: Animator;
   private callbacks: PropFactoryCallbacks;
   private sequence = 0;
 
-  constructor(interaction: InteractionSystem, ambient: AmbientSystem, callbacks: PropFactoryCallbacks) {
+  constructor(interaction: InteractionSystem, ambient: AmbientSystem, animator: Animator, callbacks: PropFactoryCallbacks) {
     this.interaction = interaction;
     this.ambient = ambient;
+    this.animator = animator;
     this.callbacks = callbacks;
   }
 
@@ -227,9 +230,18 @@ export class PropFactory {
       onHover: (active) => doorMaterial.emissive.setHex(active ? COLORS.cyan : 0x000000),
       onInteract: () => {
         open = !open;
-        door.rotation.y = open ? -1.7 : 0;
-        door.position.x = open ? -0.45 : 0;
         inner.visible = open;
+        this.animator.tween(
+          door,
+          `locker:${idSuffix}`,
+          {
+            rotation: new THREE.Euler(0, open ? -2.0 : 0, 0, door.rotation.order),
+            position: new THREE.Vector3(open ? -0.42 : 0, door.position.y, door.position.z),
+          },
+          0.6,
+          undefined,
+          () => { if (!open) inner.visible = false; },
+        );
         this.toggles[`locker:${idSuffix}`] = open;
       },
     });
@@ -318,8 +330,15 @@ export class PropFactory {
       onHover: (active) => lidMaterial.emissive.setHex(active ? COLORS.amber : 0x000000),
       onInteract: () => {
         open = !open;
-        lid.rotation.x = open ? -1.15 : 0;
-        lid.position.z = open ? -0.28 : 0;
+        this.animator.tween(
+          lid,
+          id,
+          {
+            rotation: new THREE.Euler(open ? -1.25 : 0, 0, 0, lid.rotation.order),
+            position: new THREE.Vector3(lid.position.x, lid.position.y, open ? -0.3 : 0),
+          },
+          0.55,
+        );
       },
     });
     return group;
@@ -356,8 +375,8 @@ export class PropFactory {
       onHover: (active) => ((upper.material as THREE.MeshPhysicalMaterial).emissive?.setHex(active ? 0x114455 : 0x000000)),
       onInteract: () => {
         open = !open;
-        upper.position.y = open ? 2.12 : 1.24;
-        lower.position.y = open ? -0.72 : 0.16;
+        this.animator.tween(upper, 'freezer:upper', { position: new THREE.Vector3(upper.position.x, open ? 2.14 : 1.24, upper.position.z) }, 0.7);
+        this.animator.tween(lower, 'freezer:lower', { position: new THREE.Vector3(lower.position.x, open ? -0.76 : 0.16, lower.position.z) }, 0.7);
         this.callbacks.toast(open ? 'CRYO SHELF ACCESS GRANTED' : 'CRYO SHELF SEALED');
       },
     });
@@ -405,14 +424,16 @@ export class PropFactory {
     valve.position.y = 0.08;
     group.add(pipe, valve);
     let open = false;
+    const valveKey = this.id('valve');
     this.interaction.register({
-      id: this.id('valve'),
+      id: valveKey,
       object: valve,
       label: () => (open ? 'CLOSE HYDROGEN VALVE' : 'OPEN HYDROGEN VALVE'),
       onHover: (active) => valve.scale.setScalar(active ? 1.08 : 1),
       onInteract: () => {
         open = !open;
-        valve.rotation.z += Math.PI * 0.5;
+        const target = new THREE.Euler(valve.rotation.x, valve.rotation.y, valve.rotation.z + (open ? Math.PI * 0.55 : -Math.PI * 0.55), valve.rotation.order);
+        this.animator.tween(valve, valveKey, { rotation: target }, 0.55);
         this.callbacks.toast(`H₂ MANIFOLD // ${open ? 'FLOW ENABLED' : 'FLOW ISOLATED'}`);
       },
     });
@@ -495,7 +516,8 @@ export class PropFactory {
       id: this.id('medscan'), object: arch, label: 'RUN DIAGNOSTIC SCAN',
       onHover: (active) => (scannerMaterial.emissiveIntensity = active ? 2.8 : 1.2),
       onInteract: () => {
-        arch.position.x = arch.position.x > 0 ? -0.62 : 0.62;
+        const nextX = arch.position.x > 0 ? -0.62 : 0.62;
+        this.animator.tween(arch, `medscan:${this.id('arch')}`, { position: new THREE.Vector3(nextX, arch.position.y, arch.position.z) }, 1.1);
         this.callbacks.toast('MEDSCAN // HEALTH 100% // NO CONTAMINANTS');
       },
     });

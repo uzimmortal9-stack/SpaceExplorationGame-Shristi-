@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { AmbientSystem } from '../systems/AmbientSystem';
 import { normalizedBox, normalizedCylinder } from './geometryAlignment';
-import { COLORS, emissive, glass, matte, metal } from './materials';
+import { COLORS, emissive, glass, hullMetal, matte, metal, rockMat } from './materials';
 import { damp } from '../core/Tween';
 
 export class ShipExterior {
@@ -16,9 +16,9 @@ export class ShipExterior {
 
   constructor(ambient: AmbientSystem) {
     this.root.name = 'CSV Astraea Exterior Hull';
-    const hull = metal(0x33444d, 0.3, 0.9);
-    const armor = metal(0x56656c, 0.38, 0.86);
-    const dark = metal(0x121c22, 0.42, 0.88);
+    const hull = hullMetal(0x33444d, 0.34, 0.9);
+    const armor = hullMetal(0x56656c, 0.4, 0.86);
+    const dark = hullMetal(0x121c22, 0.44, 0.88);
 
     // Long-range exploration hull wrapped around the playable interior scale.
     const belly = new THREE.Mesh(normalizedBox(29.8, 0.7, 112, 'center'), hull);
@@ -117,7 +117,7 @@ export class ShipExterior {
       gear.position.set(x, -0.15, z);
       const strut = new THREE.Mesh(normalizedCylinder(0.13, 0.17, 2.8, 10, 'floor'), metal(0x89979c, 0.26, 0.92));
       strut.rotation.z = x < 0 ? 0.2 : -0.2;
-      const foot = new THREE.Mesh(normalizedBox(1.5, 0.2, 0.85, 'floor'), matte(0x151a1d, 0.86));
+      const foot = new THREE.Mesh(normalizedBox(1.5, 0.2, 0.85, 'floor'), rockMat(0x151a1d, 0.88));
       foot.position.set(x < 0 ? -0.55 : 0.55, -2.65, 0);
       gear.add(strut, foot);
       this.root.add(gear);
