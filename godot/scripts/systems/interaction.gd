@@ -18,6 +18,10 @@ class Item:
 	var label: String
 	var detail: String
 	var enabled: bool
+	## Score bonus. Two props can sit at the same spot (a safety lid and the
+	## button underneath it); without this the one with the larger radius always
+	## wins on distance and the inner control is unreachable forever.
+	var priority: float
 	var on_use: Callable
 	var on_hover: Callable
 
@@ -37,6 +41,7 @@ func register(cfg: Dictionary) -> void:
 	it.label = cfg.get("label", "Use")
 	it.detail = cfg.get("detail", "")
 	it.enabled = cfg.get("enabled", true)
+	it.priority = cfg.get("priority", 0.0)
 	it.on_use = cfg.get("on_use", Callable())
 	it.on_hover = cfg.get("on_hover", Callable())
 	_items[it.id] = it
@@ -97,7 +102,7 @@ func update_from(eye: Vector3, forward: Vector3) -> void:
 		# must be broadly in front, unless we are right on top of it
 		if dot < 0.35 and dist > 1.1:
 			continue
-		var score := dot * 2.2 - dist / maxf(it.radius, 0.001)
+		var score := dot * 2.2 - dist / maxf(it.radius, 0.001) + it.priority
 		if score > best_score:
 			best_score = score
 			best = it

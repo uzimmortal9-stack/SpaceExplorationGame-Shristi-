@@ -4,7 +4,11 @@ shader_type canvas_item;
 
 uniform float amount : hint_range(0.0, 1.0) = 0.0;
 uniform float chroma : hint_range(0.0, 1.0) = 0.0;
-uniform sampler2D screen_texture : hint_screen_texture, filter_linear_mipmap;
+// Godot 4 removed the implicit SCREEN_TEXTURE builtin: reading the framebuffer
+// now requires an explicitly declared sampler with hint_screen_texture. Without
+// this the shader fails to compile and the warp tunnel renders as a blank rect.
+// filter_linear_mipmap + repeat_disable matches the old builtin's sampling.
+uniform sampler2D screen_texture : hint_screen_texture, filter_linear_mipmap, repeat_disable;
 
 void fragment() {
 	vec2 uv = SCREEN_UV;

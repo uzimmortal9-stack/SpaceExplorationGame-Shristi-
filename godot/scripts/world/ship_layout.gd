@@ -277,10 +277,19 @@ const DOORWAYS: Array = [
 		"to": "spine",
 		"x": -9,
 		"z": 53.5,
-		"axis": "x",
+		# The engineering/warp partition is the plane x = -9, so the wall RUNS
+		# along Z and the doorway must be declared axis "z". It was "x", which
+		# rotated the frame and its collision 90 degrees: the jambs became free
+		# standing pillars inside the two rooms while the opening itself was
+		# framed across the wall instead of within it.
+		"axis": "z",
 		"width": 2.2
 	},
 	{"id": "d_warp", "from": "warp", "to": "spine", "x": 0, "z": 49, "axis": "x", "width": 3.0},
+	# Warp room aft face (z = 62) onto the short link corridor that runs to the
+	# cargo bay. Without this the whole stern — warp -> cargo -> boarding ramp —
+	# was sealed off, because the corridor only had an opening at its far end.
+	{"id": "d_warp_aft", "from": "warp", "to": "spine", "x": 0, "z": 62, "axis": "x", "width": 3.0},
 	{"id": "d_cargo", "from": "cargo", "to": "spine", "x": 0, "z": 64, "axis": "x", "width": 3.2},
 ]
 

@@ -26,6 +26,14 @@ echo "── gdlint ──"
 gdlint scripts/ 2>&1 | tail -3
 
 echo
+echo "── wall / floor invariants ──"
+python3 tools/sim_walls.py | tail -6 || fail=$((fail + 1))
+
+echo
+echo "── runtime invariants (load errors, reachability, interactions) ──"
+python3 tools/sim_runtime.py | tail -8 || fail=$((fail + 1))
+
+echo
 echo "── project checks ──"
 python3 tools/validate.py | tail -6
 

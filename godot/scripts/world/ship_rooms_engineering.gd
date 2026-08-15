@@ -417,6 +417,12 @@ func _furnish_warp() -> void:
 		"id": "warp_lever", "position": Vector3(pedx, 1.35, pedz), "radius": 1.8,
 		"kind": &"lever", "label": "Pull warp lever", "detail": "Cover must be open",
 		"enabled": false,
+		# Exactly the throttle-lid bug again: the lever sits inside the cover's
+		# radius, so with an identical facing dot the cover (radius 1.9) always
+		# outscored the lever (radius 1.8) and the lever could never be selected.
+		# Lifting the cover achieved nothing — the prompt stayed "PULL WARP LEVER
+		# / Cover must be open" forever and warp could not be engaged on foot.
+		"priority": 1.0,
 		"on_use": func() -> String:
 			if not GameState.warp_armed:
 				Audio.ui_denied()

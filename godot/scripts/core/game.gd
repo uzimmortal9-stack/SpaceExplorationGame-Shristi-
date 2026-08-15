@@ -184,6 +184,7 @@ func start_game() -> void:
 	Audio.loop("ship_air", &"air", "Ambient")
 	Audio.set_loop_gain("ship_air", 0.16)
 
+
 func _process(delta: float) -> void:
 	if player == null or flight == null or warp == null:
 		return
@@ -214,6 +215,16 @@ func _process(delta: float) -> void:
 		exterior.visible = flight.camera_mode != FlightSystem.CameraMode.COCKPIT
 		ship_root.global_position = flight.ship_position
 		ship_root.global_transform.basis = flight.ship_basis
+		# The hull moves, so the seat the player is strapped into moves with it.
+		# Player.sit() cached an absolute world position, so once the ship flew
+		# off the seated camera stayed behind at the origin: the interior slid
+		# away and left the player looking at the outside of the ship from a
+		# fixed point in space. Re-sync the cached seat every frame.
+		if player.is_seated():
+			player.sync_seat(
+				ship_root.global_transform
+				* Vector3(ShipLayout.PILOT_SEAT.x, 1.32, ShipLayout.PILOT_SEAT.z + 0.15)
+			)
 		hud.set_flight(flight.throttle, flight.speed())
 
 		if can_act and Input.is_action_just_pressed("landing_gear"):
@@ -223,8 +234,13 @@ func _process(delta: float) -> void:
 			Audio.play_noise(1.4, 0.24, 700.0, 220.0, 1.5)
 			GameState.push_systems()
 
-		if can_act and Input.is_action_just_pressed("warp_engage") \
-				and GameState.warp_armed and warp != null and warp.stage == WarpSystem.Stage.READY:
+		if (
+			can_act
+			and Input.is_action_just_pressed("warp_engage")
+			and GameState.warp_armed
+			and warp != null
+			and warp.stage == WarpSystem.Stage.READY
+		):
 			_engage_warp()
 
 	if warp != null and warp.is_active():
@@ -234,8 +250,7 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseMotion and flight != null and flight.active \
-			and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+	if event is InputEventMouseMotion and flight != null and flight.active and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		flight.handle_mouse((event as InputEventMouseMotion).relative)
 
 

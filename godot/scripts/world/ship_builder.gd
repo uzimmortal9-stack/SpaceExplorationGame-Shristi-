@@ -20,6 +20,11 @@ const WALL_VARIANTS := ["wall_flat", "wall_band", "wall_flat", "wall_divided"]
 const VIEWPORT_ROOMS := ["bridge", "lounge", "galley", "cabin_a", "cabin_b", "medical", "science"]
 
 var _batches: Dictionary = {}  ## key -> {mesh: Mesh, xforms: Array[Transform3D]}
+## Cache of single-surface meshes pulled out of multi-surface source meshes.
+## MUST be declared: GDScript resolves every identifier at compile time, so a
+## missing declaration here is a hard "Identifier not declared" error that stops
+## the whole script — and with it the ship, because game.gd types a field as
+## `ShipBuilder`. That is what deleted the interior on the last build.
 var _surface_cache: Dictionary = {}
 var _static_body: StaticBody3D
 var door_frames: Dictionary = {}
@@ -101,8 +106,13 @@ func _build_walls(rects: Array) -> void:
 			var step := 0.5
 			var x := float(rect["x0"])
 			while x <= float(rect["x1"]) + 0.000001:
-				var exposed := (
-					x < float(rect["x1"]) and not ShipLayout.walkable(x + step * 0.5, z_edge - nz * 0.5)
+				# A ROOM boundary is always a wall (minus doorways), even when the
+				# spine abuts it — the spine has to touch the rooms so the deck is
+				# continuous, but that must not delete the partition between them.
+				# Corridor-to-corridor seams stay open so the spine is walkable.
+				var exposed := x < float(rect["x1"]) and (
+					room != null
+					or not ShipLayout.walkable(x + step * 0.5, z_edge - nz * 0.5)
 				)
 				if exposed and run_start == null:
 					run_start = x
@@ -119,8 +129,9 @@ func _build_walls(rects: Array) -> void:
 			var step := 0.5
 			var z := float(rect["z0"])
 			while z <= float(rect["z1"]) + 0.000001:
-				var exposed := (
-					z < float(rect["z1"]) and not ShipLayout.walkable(x_edge - nx * 0.5, z + step * 0.5)
+				var exposed := z < float(rect["z1"]) and (
+					room != null
+					or not ShipLayout.walkable(x_edge - nx * 0.5, z + step * 0.5)
 				)
 				if exposed and run_start == null:
 					run_start = z

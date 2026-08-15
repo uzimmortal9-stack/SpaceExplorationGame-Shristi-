@@ -295,6 +295,13 @@ func _build_throttle() -> void:
 		"label": "Engage main drive",
 		"detail": "Safety lid must be open",
 		"enabled": false,
+		# The button sits 2 cm under the lid, so both are always in range with an
+		# identical facing dot. Distance/radius alone therefore always favoured
+		# the lid (the wider radius), and the button — although enabled and lit —
+		# could never become the candidate. The drive stayed unarmed, the pilot
+		# seat refused to accept you, and the ship could never be flown.
+		# Once the lid is open the button must outrank it.
+		"priority": 1.0,
 		"on_use": func() -> String:
 			Audio.ui_confirm()
 			Audio.lever_pull()
