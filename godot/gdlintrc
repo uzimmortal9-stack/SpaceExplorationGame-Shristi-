@@ -1,0 +1,25 @@
+# Lint policy for Aurora Drift.
+#
+# NOTE: do NOT run `gdformat` on this tree. gdtoolkit 4.5.0 mis-handles the
+# inline `func() -> String:` lambdas used for interaction callbacks: it hoists
+# and duplicates the surrounding comments into the lambda body, corrupting the
+# file. Verified by diffing function sets and duplicated doc-comments.
+# Formatting here is maintained by hand and checked with `gdparse` + `gdlint`.
+#
+# max-line-length 150  — the port keeps the TypeScript source's data tables
+#   (room definitions, palette swatches) inline and readable; wrapping them
+#   hurts more than it helps. A handful of dialogue strings cannot be split
+#   without concatenation.
+#
+# max-file-lines 1200  — ship_rooms.gd is one cohesive unit: every compartment's
+#   fit-out plus its interactions, with closures kept next to the props they
+#   drive. The engineering half already lives in ship_rooms_engineering.gd.
+#
+# class-definitions-order  — scripts are grouped by responsibility
+#   (state -> build -> update -> helpers) rather than GDScript's canonical
+#   member ordering, which reads far better for a port of this size.
+max-line-length: 150
+max-file-lines: 1200
+max-returns: 12
+disable:
+  - class-definitions-order

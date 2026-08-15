@@ -1,0 +1,153 @@
+[gd_scene load_steps=6 format=3 uid="uid://bi7t73rtur62w"]
+
+[ext_resource type="Script" path="res://scripts/core/game.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="2"]
+[ext_resource type="Shader" path="res://shaders/warp_distort.gdshader" id="3"]
+
+[sub_resource type="Environment" id="env"]
+background_mode = 1
+background_color = Color(0.02, 0.027, 0.047, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.35, 0.42, 0.55, 1)
+ambient_light_energy = 0.35
+tonemap_mode = 3
+tonemap_exposure = 0.72
+tonemap_white = 4.0
+ssao_enabled = true
+ssao_radius = 1.2
+ssao_intensity = 1.4
+glow_enabled = true
+glow_intensity = 0.35
+glow_bloom = 0.15
+glow_blend_mode = 1
+glow_hdr_threshold = 1.25
+adjustment_enabled = true
+adjustment_contrast = 1.05
+adjustment_saturation = 1.05
+
+[sub_resource type="ShaderMaterial" id="distort_mat"]
+shader = ExtResource("3")
+shader_parameter/amount = 0.0
+shader_parameter/chroma = 0.0
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("env")
+
+[node name="Distort" type="ColorRect" parent="."]
+visible = false
+material = SubResource("distort_mat")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Hud" type="CanvasLayer" parent="."]
+script = ExtResource("2")
+
+[node name="BootScreen" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BG" type="ColorRect" parent="BootScreen"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.02, 0.027, 0.047, 1)
+
+[node name="Center" type="CenterContainer" parent="BootScreen"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="VBox" type="VBoxContainer" parent="BootScreen/Center"]
+custom_minimum_size = Vector2(520, 0)
+layout_mode = 2
+
+[node name="Title" type="Label" parent="BootScreen/Center/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 52
+text = "AURORA DRIFT"
+horizontal_alignment = 1
+
+[node name="Tag" type="Label" parent="BootScreen/Center/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0, 0.94, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "DEEP SPACE SURVEY  -  ILEX EXPEDITION"
+horizontal_alignment = 1
+
+[node name="Spacer" type="Control" parent="BootScreen/Center/VBox"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+
+[node name="Bar" type="ProgressBar" parent="BootScreen/Center/VBox"]
+custom_minimum_size = Vector2(0, 4)
+layout_mode = 2
+max_value = 1.0
+show_percentage = false
+
+[node name="Status" type="Label" parent="BootScreen/Center/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.58, 0.67, 1)
+theme_override_font_sizes/font_size = 11
+text = "Initialising..."
+horizontal_alignment = 1
+
+[node name="Menu" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BG" type="ColorRect" parent="Menu"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.012, 0.024, 0.043, 0.86)
+
+[node name="Center" type="CenterContainer" parent="Menu"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="VBox" type="VBoxContainer" parent="Menu/Center"]
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Menu/Center/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 46
+text = "AURORA DRIFT"
+horizontal_alignment = 1
+
+[node name="Lede" type="Label" parent="Menu/Center/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.58, 0.67, 1)
+theme_override_font_sizes/font_size = 13
+text = "Survey vessel - mission day 412
+A repeating signal from Ilex Prime."
+horizontal_alignment = 1
+
+[node name="Spacer" type="Control" parent="Menu/Center/VBox"]
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+
+[node name="Start" type="Button" parent="Menu/Center/VBox"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "BEGIN EXPEDITION"
+
+[node name="Quit" type="Button" parent="Menu/Center/VBox"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+text = "QUIT"

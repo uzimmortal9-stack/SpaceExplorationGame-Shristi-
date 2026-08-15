@@ -106,6 +106,10 @@ export class Input {
   private readonly onLockChange: () => void;
   private readonly onBlur: () => void;
 
+  private lastMouseX: number | null = null;
+  private lastMouseY: number | null = null;
+  private isPointerDown = false;
+
   constructor(private readonly target: HTMLElement) {
     this.onKeyDown = (e) => {
       if (e.repeat) return;
@@ -122,9 +126,27 @@ export class Input {
       this.releasedThisFrame.add(e.code);
     };
     this.onMouseMove = (e) => {
-      if (!this.pointerLocked || !this.enabled) return;
-      this.mouseDX += e.movementX * 0.0022 * this.sensitivity;
-      this.mouseDY += e.movementY * 0.0022 * this.sensitivity * (this.invertY ? -1 : 1);
+      if (!this.enabled) return;
+
+      if (this.pointerLocked) {
+        this.mouseDX += e.movementX * 0.0022 * this.sensitivity;
+        this.mouseDY += e.movementY * 0.0022 * this.sensitivity * (this.invertY ? -1 : 1);
+        this.lastMouseX = e.clientX;
+        this.lastMouseY = e.clientY;
+      } else if (this.isPointerDown || (e.buttons & 1)) {
+        // Fallback for browsers / devtools device mode where pointer lock is blocked
+        if (this.lastMouseX !== null && this.lastMouseY !== null) {
+          const dx = e.clientX - this.lastMouseX;
+          const dy = e.clientY - this.lastMouseY;
+          this.mouseDX += dx * 0.0035 * this.sensitivity;
+          this.mouseDY += dy * 0.0035 * this.sensitivity * (this.invertY ? -1 : 1);
+        }
+        this.lastMouseX = e.clientX;
+        this.lastMouseY = e.clientY;
+      } else {
+        this.lastMouseX = e.clientX;
+        this.lastMouseY = e.clientY;
+      }
     };
     this.onWheel = (e) => {
       if (!this.enabled) return;
@@ -132,11 +154,25 @@ export class Input {
     };
     this.onLockChange = () => {
       this.pointerLocked = document.pointerLockElement === this.target;
-      if (!this.pointerLocked) this.down.clear();
     };
     this.onBlur = () => {
       this.down.clear();
+      this.isPointerDown = false;
+      this.lastMouseX = null;
+      this.lastMouseY = null;
     };
+
+    target.addEventListener('pointerdown', (e) => {
+      if (e.button === 0) {
+        this.isPointerDown = true;
+        this.lastMouseX = e.clientX;
+        this.lastMouseY = e.clientY;
+        this.requestPointerLock();
+      }
+    });
+    window.addEventListener('pointerup', () => {
+      this.isPointerDown = false;
+    });
 
     window.addEventListener('keydown', this.onKeyDown, { passive: false });
     window.addEventListener('keyup', this.onKeyUp);
@@ -157,7 +193,16 @@ export class Input {
 
   requestPointerLock(): void {
     if (document.pointerLockElement !== this.target) {
-      void this.target.requestPointerLock?.();
+      try {
+        const p = this.target.requestPointerLock?.();
+        if (p && typeof (p as Promise<void>).catch === 'function') {
+          (p as Promise<void>).catch(() => {
+            // Pointer lock may be rejected by browser in touch emulation or iframe
+          });
+        }
+      } catch {
+        // Ignore pointer lock denial
+      }
     }
   }
 

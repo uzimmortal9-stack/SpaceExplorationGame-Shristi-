@@ -279,12 +279,18 @@ export class Hud {
     const card = el('div', 'overlay-card panel');
     card.append(el('h3', 'panel-title', title));
     build(card);
-    const close = el('button', 'btn clickable', 'Close');
-    close.addEventListener('click', () => this.hide(id));
+    const close = el('button', 'btn clickable', id === 'controls' ? 'Got It · Return to Ship' : 'Close');
+    close.addEventListener('click', () => {
+      this.hide(id);
+      this.cb.onResume();
+    });
     card.append(el('div', undefined, '<br>'), close);
     wrap.append(card);
     wrap.addEventListener('mousedown', (e) => {
-      if (e.target === wrap) this.hide(id);
+      if (e.target === wrap) {
+        this.hide(id);
+        this.cb.onResume();
+      }
     });
     this.root.append(wrap);
     this.overlays.set(id, wrap);

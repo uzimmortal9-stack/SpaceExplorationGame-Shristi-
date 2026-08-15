@@ -233,9 +233,19 @@ export class Game {
       this.ship.lights.setAlert(Boolean((e as CustomEvent).detail));
     });
 
+    let hadPointerLock = false;
     document.addEventListener('pointerlockchange', () => {
-      if (!this.input.pointerLocked && this.running && !this.hud.isOpen() && !this.state.cinematic) {
+      if (this.input.pointerLocked) {
+        hadPointerLock = true;
+      } else if (hadPointerLock && this.running && !this.hud.isOpen() && !this.state.cinematic) {
+        hadPointerLock = false;
         this.pause();
+      }
+    });
+
+    this.renderer.canvas.addEventListener('click', () => {
+      if (this.running && !this.hud.isOpen()) {
+        this.resume();
       }
     });
   }
