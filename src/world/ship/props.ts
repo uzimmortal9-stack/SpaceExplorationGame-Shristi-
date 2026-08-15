@@ -52,8 +52,15 @@ export class PropPlacer {
     const info = this.assets.info(id);
 
     let scale = opts.scale ?? 1;
-    if (opts.height && info && info.size.y > 1e-4) scale = opts.height / info.size.y;
-    else if (opts.width && info && info.size.x > 1e-4) scale = opts.width / info.size.x;
+    if (opts.height && info && info.size.y > 1e-4) {
+      scale = opts.height / info.size.y;
+    } else if (opts.width && info) {
+      // Scale by the longest horizontal axis: many kit pieces (railings,
+      // pipes, trims) are authored along Z, and dividing by a 6 cm X extent
+      // would blow them up enormously.
+      const span = Math.max(info.size.x, info.size.z);
+      if (span > 1e-4) scale = opts.width / span;
+    }
     g.scale.setScalar(scale);
 
     const y = opts.y ?? 0;

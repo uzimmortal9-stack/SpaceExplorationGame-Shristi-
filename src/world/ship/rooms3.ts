@@ -741,15 +741,39 @@ export function furnishCargo(ctx: RoomCtx): CargoRefs {
   const cx = (room.x0 + room.x1) / 2;
   const cz = (room.z0 + room.z1) / 2;
 
-  // cargo containers, restraints, loader
-  props.place('crate_large', room.x0 + 2.0, room.z0 + 2.0, { height: 1.5, solid: true, ry: 0.05 });
-  props.place('crate_large', room.x0 + 2.0, room.z0 + 4.2, { height: 1.5, solid: true, ry: -0.05 });
-  props.place('crate', room.x1 - 2.2, room.z0 + 2.0, { height: 1.1, solid: true });
-  props.place('crate_tarp', room.x1 - 2.2, room.z0 + 4.2, { height: 1.2, solid: true, ry: 0.2 });
-  props.place('container_full', room.x0 + 2.2, cz + 1.0, { height: 0.7, solid: true });
-  props.place('barrel', room.x1 - 2.0, cz + 1.4, { height: 0.9, solid: true });
-  props.place('clamp', room.x0 + 3.6, room.z0 + 1.2, { height: 0.3 });
-  props.place('clamp', room.x1 - 3.6, room.z0 + 1.2, { height: 0.3 });
+  // ---- cargo: stacked containers down both sides, walkway kept clear -------
+  for (let i = 0; i < 4; i++) {
+    const pz = room.z0 + 2.2 + i * 2.6;
+    props.place('crate_large', room.x0 + 2.2, pz, { height: 1.5, solid: true, ry: i * 0.04 });
+    if (i % 2 === 0) {
+      props.place('crate', room.x0 + 2.2, pz, { height: 1.0, y: 1.5, solid: false, ry: 0.2 });
+    }
+    props.place(i % 2 ? 'crate_tarp' : 'crate', room.x1 - 2.2, pz, {
+      height: i % 2 ? 1.2 : 1.1, solid: true, ry: -i * 0.05,
+    });
+  }
+  props.place('container_full', room.x0 + 2.4, cz + 3.4, { height: 0.7, solid: true });
+  props.place('container_full', room.x1 - 2.4, cz + 3.4, { height: 0.7, solid: true, ry: 0.3 });
+  props.place('barrel', room.x1 - 4.6, room.z0 + 1.6, { height: 0.9, solid: true });
+  props.place('barrel_open', room.x1 - 5.8, room.z0 + 1.6, { height: 0.9, solid: true });
+  props.place('barrel_large', room.x0 + 4.8, room.z0 + 1.6, { height: 1.4, solid: true });
+  props.place('shelves_tall', room.x0 + 1.2, room.z1 - 2.4, { ry: Math.PI / 2, height: 2.0, solid: true, colliderScale: 0.7 });
+  props.place('shelves_short', room.x1 - 1.2, room.z1 - 2.4, { ry: -Math.PI / 2, height: 1.3, solid: true, colliderScale: 0.7 });
+  props.scatter(['ammo_box', 'healthpack', 'keycard', 'crate'],
+    room.x0 + 0.9, room.z1 - 3.0, room.x0 + 1.5, room.z1 - 1.8, 5, { height: 0.2, y: 1.05 });
+  props.place('clamp', room.x0 + 4.4, room.z0 + 5.6, { height: 0.3 });
+  props.place('clamp', room.x1 - 4.4, room.z0 + 5.6, { height: 0.3 });
+  props.place('crate', 0, room.z0 + 1.4, { height: 0.8, solid: true, ry: 0.15 });
+  props.place('access_point', room.x1 - 1.1, cz - 3.0, { height: 0.6, ry: -Math.PI / 2, solid: true });
+
+  // deck hazard striping along the ramp centreline
+  for (let i = 0; i < 7; i++) {
+    const stripe = new Mesh(new PlaneGeometry(0.3, 2.6), mats.warnStripe);
+    stripe.rotation.x = -Math.PI / 2;
+    stripe.rotation.z = Math.PI / 4;
+    stripe.position.set(-3.2 + i * 1.06, 0.012, room.z1 - 3.6);
+    g.add(stripe);
+  }
 
   // ---- EVA suit station ----------------------------------------------------
   const suits: Group[] = [];

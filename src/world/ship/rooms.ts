@@ -464,10 +464,69 @@ export function furnishBridge(ctx: RoomCtx): void {
     g.add(side);
   }
 
+  // ---- aft crew stations --------------------------------------------------
+  // The bridge is the largest compartment; fill the aft half with working
+  // stations so it reads as a crewed command deck rather than two chairs.
+  for (const sx of [-1, 1]) {
+    const bx = sx * 5.6;
+    props.place('desk_large', bx, -21.0, { ry: sx > 0 ? -Math.PI / 2 : Math.PI / 2, height: 0.85, solid: true });
+    props.place('office_chair', bx - sx * 1.5, -21.0, { ry: sx > 0 ? Math.PI / 2 : -Math.PI / 2, height: 1.05, solid: true, colliderScale: 0.6 });
+    props.place('console_small', bx + sx * 0.25, -21.0, { ry: sx > 0 ? -Math.PI / 2 : Math.PI / 2, height: 0.4, y: 0.85 });
+    props.place('mug', bx - sx * 0.4, -20.2, { height: 0.1, y: 0.85 });
+
+    props.place('console', sx * 7.4, -24.4, { ry: sx > 0 ? -Math.PI / 2 : Math.PI / 2, height: 1.15, solid: true });
+    props.place('shelves_thin', sx * 7.8, -18.4, { ry: sx > 0 ? -Math.PI / 2 : Math.PI / 2, height: 1.9, solid: true, colliderScale: 0.7 });
+    props.place('plant_b', sx * 7.6, -17.0, { height: 0.9 });
+    props.place('crate', sx * 6.6, -17.2, { height: 0.55, solid: true, ry: sx * 0.3 });
+
+    // status boards flanking the command deck
+    wallScreenBridge(ctx, sx * 8.9, 1.95, -21.5, sx > 0 ? -Math.PI / 2 : Math.PI / 2, sx > 0);
+  }
+
+  // engineering repeater at the rear bulkhead
+  props.place('console', 0, -16.9, { ry: 0, height: 1.15, solid: true });
+  props.place('railing', -4.5, -17.2, { width: 4.0 });
+  props.place('railing', 4.5, -17.2, { width: 4.0 });
+  props.place('light_floor', -8.4, -27.5, { height: 0.5 });
+  props.place('light_floor', 8.4, -27.5, { height: 0.5 });
+
   // ambient clutter that sells "lived in"
   props.place('mug', -2.6, -25.4, { height: 0.11, y: 1.02 });
   props.place('keycard', 2.35, -25.6, { height: 0.02, y: 1.02, ry: 0.4 });
+  props.place('healthpack', 6.2, -20.4, { height: 0.14, y: 0.85, ry: 0.5 });
   void assets;
+}
+
+/** Status board on a bridge side bulkhead. */
+function wallScreenBridge(ctx: RoomCtx, x: number, y: number, z: number, ry: number, right: boolean): void {
+  const tex = makeLabelTexture(
+    right
+      ? [
+          { text: 'PROPULSION', size: 26, color: '#00f0ff', y: 32, mono: true, align: 'left' },
+          { text: 'MAIN DRIVE   IDLE', size: 22, color: '#ffb000', y: 86, mono: true, align: 'left' },
+          { text: 'RCS          NOM', size: 22, color: '#3ee88b', y: 124, mono: true, align: 'left' },
+          { text: 'REACTOR      72%', size: 22, color: '#3ee88b', y: 162, mono: true, align: 'left' },
+          { text: 'WARP CORE  COLD', size: 22, color: '#8095ab', y: 200, mono: true, align: 'left' },
+        ]
+      : [
+          { text: 'NAVIGATION', size: 26, color: '#00f0ff', y: 32, mono: true, align: 'left' },
+          { text: 'SYSTEM  AURELIS', size: 22, color: '#dbe7f3', y: 86, mono: true, align: 'left' },
+          { text: 'BODIES        6', size: 22, color: '#dbe7f3', y: 124, mono: true, align: 'left' },
+          { text: 'BEARING 214.6', size: 22, color: '#ffb000', y: 162, mono: true, align: 'left' },
+          { text: 'DRIFT     0.02', size: 22, color: '#3ee88b', y: 200, mono: true, align: 'left' },
+        ],
+    { w: 512, h: 256, grid: true, border: '#1f3347' },
+  );
+  const m = new Mesh(
+    new PlaneGeometry(1.5, 0.75),
+    new MeshStandardMaterial({
+      map: tex, emissiveMap: tex, emissive: new Color(0xffffff),
+      emissiveIntensity: 0.8, roughness: 0.24,
+    }),
+  );
+  m.position.set(x, y, z);
+  m.rotation.y = ry;
+  ctx.runtime.group.add(m);
 }
 
 // ------------------------------------------------------------- crew cabins
