@@ -1,204 +1,242 @@
-import * as THREE from "three";
-import { assetLoader as AL } from "./assets";
-
 /**
- * Materials — a PBR material library. Albedo/normal/roughness maps are real
- * downloaded textures (ambientCG, three.js sample PBR sets, Poly Haven).
- * Emissive is used strictly as a small accent (buttons, indicator strips),
- * never as the primary illumination.
+ * Materials — the shared palette.
+ *
+ * Rules enforced here (the previous build failed on exactly these):
+ *   * No canvas-painted "PBR" maps. Albedo/normal/roughness come from the
+ *     downloaded ambientCG / three.js sets via AssetLoader, or from plain,
+ *     honest constant-colour PBR values.
+ *   * Emissive is only ever used for things that genuinely emit: screens,
+ *     indicator LEDs, holograms, the warp core, bioluminescence. Its intensity
+ *     is kept low enough that bloom does the work, not raw brightness.
  */
 
-export type MatName =
-  | "hull"
-  | "hullLight"
-  | "hullDark"
-  | "floor"
-  | "floorDark"
-  | "wall"
-  | "wallDark"
-  | "trim"
-  | "console"
-  | "panel"
-  | "metal"
-  | "steel"
-  | "gold"
-  | "rubber"
-  | "fabric"
-  | "bedding"
-  | "plant"
-  | "glass"
-  | "jungleGround"
-  | "jungleGround2"
-  | "rock"
-  | "treeBark"
-  | "leaf"
-  | "ruin"
-  | "water"
-  | "ice"
-  | "emissiveCyan"
-  | "emissiveAmber"
-  | "emissiveRed"
-  | "emissiveGreen"
-  | "emissiveBlue"
-  | "soil"
-  | "sand"
-  | "moss";
+import {
+  AdditiveBlending,
+  BackSide,
+  Color,
+  DoubleSide,
+  FrontSide,
+  MeshBasicMaterial,
+  MeshPhysicalMaterial,
+  MeshStandardMaterial,
+  Texture,
+} from 'three';
 
-const mats = new Map<MatName, THREE.Material>();
+import type { AssetLoader, SurfaceSet } from '../assets/assetLoader';
 
-function std(
-  name: MatName,
-  opts: {
-    color?: number;
-    map?: THREE.Texture;
-    normal?: THREE.Texture;
-    rough?: number;
-    metal?: number;
-    emissive?: number;
-    emissiveIntensity?: number;
-    roughnessMap?: THREE.Texture;
-    transparent?: boolean;
-    opacity?: number;
-    side?: THREE.Side;
-  },
-): THREE.MeshStandardMaterial {
-  const params: THREE.MeshStandardMaterialParameters = {
-    color: opts.color ?? 0xffffff,
-    roughness: opts.rough ?? 0.6,
-    metalness: opts.metal ?? 0.0,
-    emissive: opts.emissive ?? 0x000000,
-    emissiveIntensity: opts.emissiveIntensity ?? 1,
-    transparent: opts.transparent ?? false,
-    opacity: opts.opacity ?? 1,
-    side: opts.side ?? THREE.FrontSide,
+export const PALETTE = {
+  hullLight: 0xb9c2cc,
+  hullMid: 0x6e7885,
+  hullDark: 0x2d343d,
+  deck: 0x3a4149,
+  trim: 0x141920,
+  accent: 0x00d8ff,
+  accentWarm: 0xffb000,
+  warn: 0xff6600,
+  danger: 0xff2244,
+  screen: 0x0a1622,
+  glass: 0x9fd4e8,
+  jungle: 0x2f7a3f,
+  bio: 0x46f5c8,
+  bioViolet: 0xb46cff,
+} as const;
+
+export interface MaterialLibrary {
+  hull: MeshStandardMaterial;
+  hullDark: MeshStandardMaterial;
+  deck: MeshStandardMaterial;
+  deckPlate: MeshStandardMaterial;
+  trim: MeshStandardMaterial;
+  rubber: MeshStandardMaterial;
+  glass: MeshPhysicalMaterial;
+  glassTint: MeshPhysicalMaterial;
+  smartGlass: MeshPhysicalMaterial;
+  screenDark: MeshStandardMaterial;
+  chrome: MeshStandardMaterial;
+  brushed: MeshStandardMaterial;
+  copper: MeshStandardMaterial;
+  padding: MeshStandardMaterial;
+  warnStripe: MeshStandardMaterial;
+  rock: MeshStandardMaterial;
+  stone: MeshStandardMaterial;
+  ground: MeshStandardMaterial;
+  foliage: MeshStandardMaterial;
+  water: MeshPhysicalMaterial;
+  /** Emissive accents — bloom carries these, they do not light the room. */
+  accent(color: number, intensity?: number): MeshStandardMaterial;
+  glow(color: number, opacity?: number): MeshBasicMaterial;
+  screen(color: number, intensity?: number): MeshStandardMaterial;
+  dispose(): void;
+}
+
+function std(params: ConstructorParameters<typeof MeshStandardMaterial>[0]): MeshStandardMaterial {
+  return new MeshStandardMaterial({ side: FrontSide, ...params });
+}
+
+function applySurface(mat: MeshStandardMaterial, set: SurfaceSet, repeat: number): void {
+  if (!set.available) return;
+  const assign = (slot: 'map' | 'normalMap' | 'roughnessMap' | 'aoMap', tex?: Texture) => {
+    if (!tex) return;
+    const t = tex.clone();
+    t.needsUpdate = true;
+    t.wrapS = t.wrapT = tex.wrapS;
+    t.repeat.set(repeat, repeat);
+    (mat as unknown as Record<string, Texture>)[slot] = t;
   };
-  if (opts.map) params.map = opts.map;
-  if (opts.normal) params.normalMap = opts.normal;
-  if (opts.roughnessMap) params.roughnessMap = opts.roughnessMap;
-  const m = new THREE.MeshStandardMaterial(params);
-  mats.set(name, m);
-  return m;
+  assign('map', set.map);
+  assign('normalMap', set.normalMap);
+  assign('roughnessMap', set.roughnessMap);
+  mat.needsUpdate = true;
 }
 
-function emis(name: MatName, color: number, intensity = 2.5): THREE.MeshStandardMaterial {
-  const m = new THREE.MeshStandardMaterial({
-    color: 0x000000,
-    emissive: color,
-    emissiveIntensity: intensity,
-    roughness: 0.4,
-    metalness: 0.0,
-  });
-  mats.set(name, m);
-  return m;
-}
+export function createMaterials(assets: AssetLoader): MaterialLibrary {
+  const cache = new Map<string, MeshStandardMaterial | MeshBasicMaterial>();
+  const owned: Array<{ dispose(): void }> = [];
+  const own = <T extends { dispose(): void }>(m: T): T => {
+    owned.push(m);
+    return m;
+  };
 
-export function initMaterials(): void {
-  const T = 8; // tiling factor helper
+  const hull = own(std({ color: PALETTE.hullLight, roughness: 0.46, metalness: 0.62 }));
+  const hullDark = own(std({ color: PALETTE.hullDark, roughness: 0.52, metalness: 0.72 }));
+  const deck = own(std({ color: PALETTE.deck, roughness: 0.68, metalness: 0.35 }));
+  const deckPlate = own(std({ color: 0x2a3038, roughness: 0.58, metalness: 0.55 }));
+  const trim = own(std({ color: PALETTE.trim, roughness: 0.38, metalness: 0.8 }));
+  const rubber = own(std({ color: 0x14171c, roughness: 0.93, metalness: 0.0 }));
+  const chrome = own(std({ color: 0xdfe6ee, roughness: 0.14, metalness: 1.0 }));
+  const brushed = own(std({ color: 0x8d97a3, roughness: 0.34, metalness: 0.9 }));
+  const copper = own(std({ color: 0xc0713a, roughness: 0.3, metalness: 0.95 }));
+  const padding = own(std({ color: 0x232a34, roughness: 0.88, metalness: 0.02 }));
+  const warnStripe = own(std({ color: PALETTE.warn, roughness: 0.6, metalness: 0.1, emissive: new Color(PALETTE.warn), emissiveIntensity: 0.12 }));
+  const screenDark = own(std({ color: PALETTE.screen, roughness: 0.22, metalness: 0.1 }));
 
-  // Hull / structures — carbon PBR set (real albedo + normal)
-  const carbon = AL.texture("textures/Carbon.png", 4);
-  const carbonN = AL.dataTexture("textures/Carbon_Normal.png", 4);
-  std("hull", { map: carbon, normal: carbonN, rough: 0.35, metal: 0.9, color: 0xb8c4cc });
-  std("hullLight", { map: carbon, normal: carbonN, rough: 0.3, metal: 0.85, color: 0xd4dee4 });
-  std("hullDark", { map: carbon, normal: carbonN, rough: 0.5, metal: 0.7, color: 0x6b7480 });
+  const glass = own(
+    new MeshPhysicalMaterial({
+      color: 0xffffff,
+      roughness: 0.03,
+      metalness: 0.0,
+      transmission: 0.96,
+      thickness: 0.05,
+      ior: 1.45,
+      transparent: true,
+      opacity: 1,
+      side: DoubleSide,
+      envMapIntensity: 1.3,
+    }),
+  );
+  const glassTint = own(
+    new MeshPhysicalMaterial({
+      color: PALETTE.glass,
+      roughness: 0.07,
+      metalness: 0.0,
+      transmission: 0.86,
+      thickness: 0.08,
+      ior: 1.5,
+      transparent: true,
+      side: DoubleSide,
+      envMapIntensity: 1.2,
+    }),
+  );
+  /** PDLC smart film: opacity/roughness are animated between clear and opaque. */
+  const smartGlass = own(
+    new MeshPhysicalMaterial({
+      color: 0xdfeaf2,
+      roughness: 0.05,
+      metalness: 0.0,
+      transmission: 0.95,
+      thickness: 0.03,
+      ior: 1.45,
+      transparent: true,
+      side: DoubleSide,
+    }),
+  );
 
-  // Ship floors — real checkerboard PBR set
-  const floor = AL.texture("textures/FloorsCheckerboard_S_Diffuse.jpg", T * 2);
-  const floorN = AL.dataTexture("textures/FloorsCheckerboard_S_Normal.jpg", T * 2);
-  std("floor", { map: floor, normal: floorN, rough: 0.65, metal: 0.15 });
-  std("floorDark", { map: floor, normal: floorN, rough: 0.7, metal: 0.1, color: 0x8899aa });
+  const rock = own(std({ color: 0x8b8f96, roughness: 0.95, metalness: 0.02 }));
+  applySurface(rock, assets.surface('rock'), 6);
+  const stone = own(std({ color: 0x9aa08f, roughness: 0.92, metalness: 0.02 }));
+  applySurface(stone, assets.surface('stone'), 3);
+  const ground = own(std({ color: 0x4c6b3a, roughness: 0.98, metalness: 0.0 }));
+  applySurface(ground, assets.surface('ground'), 48);
+  const foliage = own(
+    std({ color: PALETTE.jungle, roughness: 0.85, metalness: 0.0, side: DoubleSide }),
+  );
 
-  // Walls / panels — carbon tinted
-  const wall = AL.texture("textures/Carbon.png", T);
-  const wallN = AL.dataTexture("textures/Carbon_Normal.png", T);
-  std("wall", { map: wall, normal: wallN, rough: 0.6, metal: 0.35, color: 0xc2cbd4 });
-  std("wallDark", { map: wall, normal: wallN, rough: 0.55, metal: 0.4, color: 0x7c8693 });
-  std("trim", { map: wall, normal: wallN, rough: 0.3, metal: 0.85, color: 0xe0e8f0 });
+  const water = own(
+    new MeshPhysicalMaterial({
+      color: 0x1d6f88,
+      roughness: 0.08,
+      metalness: 0.0,
+      transmission: 0.7,
+      thickness: 1.2,
+      ior: 1.33,
+      transparent: true,
+      side: DoubleSide,
+      emissive: new Color(PALETTE.bio),
+      emissiveIntensity: 0.22,
+      envMapIntensity: 1.4,
+    }),
+  );
 
-  std("console", { map: carbon, normal: carbonN, rough: 0.4, metal: 0.6, color: 0x39424c });
-  std("panel", { map: carbon, normal: carbonN, rough: 0.45, metal: 0.5, color: 0x9aa7b3 });
-  std("steel", { map: carbon, normal: carbonN, rough: 0.3, metal: 0.9, color: 0xcfd6dc });
-  std("metal", { map: carbon, normal: carbonN, rough: 0.4, metal: 0.85, color: 0x9aa4ad });
+  const accent = (color: number, intensity = 1.1): MeshStandardMaterial => {
+    const key = `a${color}:${intensity}`;
+    const hit = cache.get(key);
+    if (hit) return hit as MeshStandardMaterial;
+    const m = own(
+      std({
+        color: 0x05070a,
+        roughness: 0.4,
+        metalness: 0.2,
+        emissive: new Color(color),
+        emissiveIntensity: intensity,
+      }),
+    );
+    cache.set(key, m);
+    return m;
+  };
 
-  // Gold — real scratched gold normal set
-  const goldN = AL.dataTexture("textures/gold/Scratched_gold_01_1K_Normal.png", 3);
-  std("gold", { normal: goldN, rough: 0.18, metal: 1.0, color: 0xdfb34a });
+  const glow = (color: number, opacity = 0.55): MeshBasicMaterial => {
+    const key = `g${color}:${opacity}`;
+    const hit = cache.get(key);
+    if (hit) return hit as MeshBasicMaterial;
+    const m = own(
+      new MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity,
+        blending: AdditiveBlending,
+        depthWrite: false,
+        side: BackSide,
+      }),
+    );
+    cache.set(key, m);
+    return m;
+  };
 
-  std("rubber", { color: 0x11141a, rough: 0.9, metal: 0.0 });
-  std("fabric", { color: 0x39424f, rough: 1.0, metal: 0.0 });
-  std("bedding", { color: 0x9aa8b8, rough: 0.95, metal: 0.0 });
-  std("plant", { color: 0x2e7d4f, rough: 0.9, metal: 0.0 });
+  const screen = (color: number, intensity = 0.85): MeshStandardMaterial => {
+    const key = `s${color}:${intensity}`;
+    const hit = cache.get(key);
+    if (hit) return hit as MeshStandardMaterial;
+    const m = own(
+      std({
+        color: 0x060a10,
+        roughness: 0.18,
+        metalness: 0.05,
+        emissive: new Color(color),
+        emissiveIntensity: intensity,
+      }),
+    );
+    cache.set(key, m);
+    return m;
+  };
 
-  // Glass
-  const gm = new THREE.MeshPhysicalMaterial({
-    color: 0xbfe6f0,
-    transparent: true,
-    opacity: 0.25,
-    roughness: 0.08,
-    metalness: 0.0,
-    transmission: 0.6,
-    thickness: 0.2,
-    side: THREE.DoubleSide,
-  });
-  mats.set("glass", gm);
-
-  // Jungle / planet
-  const soil = AL.texture("textures/hardwood2_diffuse.jpg", 1);
-  const soilN = AL.dataTexture("textures/hardwood2_bump.jpg", 1);
-  std("jungleGround", { map: soil, normal: soilN, rough: 1.0, metal: 0.0, color: 0x3f5a33 });
-  const soil2 = AL.texture("textures/brick_diffuse.jpg", 1);
-  const soil2N = AL.dataTexture("textures/brick_bump.jpg", 1);
-  std("jungleGround2", { map: soil2, normal: soil2N, rough: 1.0, metal: 0.0, color: 0x2c3f28 });
-  std("soil", { map: soil, normal: soilN, rough: 1.0, metal: 0.0, color: 0x3a3226 });
-  std("sand", { map: soil, normal: soilN, rough: 1.0, metal: 0.0, color: 0x9a8d6a });
-
-  const rock = AL.texture("textures/ambientcg/Ice002_1K-JPG_Color.jpg", 1);
-  const rockN = AL.dataTexture("textures/ambientcg/Ice002_1K-JPG_NormalGL.jpg", 1);
-  std("rock", { map: rock, normal: rockN, rough: 0.95, metal: 0.0, color: 0x8b8b93 });
-  std("ruin", { map: rock, normal: rockN, rough: 0.85, metal: 0.05, color: 0x77776e });
-  std("moss", { map: soil, normal: soilN, rough: 1.0, metal: 0.0, color: 0x2f5d33 });
-
-  const bark = AL.texture("textures/hardwood2_diffuse.jpg", 1);
-  const barkN = AL.dataTexture("textures/hardwood2_bump.jpg", 1);
-  std("treeBark", { map: bark, normal: barkN, rough: 0.95, metal: 0.0, color: 0x6d4c35 });
-
-  const leaf = AL.texture("textures/hardwood2_diffuse.jpg", 1);
-  const leafN = AL.dataTexture("textures/hardwood2_bump.jpg", 1);
-  std("leaf", { map: leaf, normal: leafN, rough: 0.9, metal: 0.0, color: 0x3f8f4f });
-
-  // Water — mostly color; a subtle emissive for the bioluminescent pool
-  std("water", { color: 0x2ec9b8, rough: 0.15, metal: 0.0, transparent: true, opacity: 0.8 });
-
-  const ice = AL.texture("textures/ambientcg/Ice003_1K-JPG_Color.jpg", 1);
-  std("ice", { map: ice, rough: 0.25, metal: 0.0, color: 0xcfe8f2 });
-
-  // Emissive accents only
-  emis("emissiveCyan", 0x22e6ff, 1.6);
-  emis("emissiveAmber", 0xffb000, 1.4);
-  emis("emissiveRed", 0xff2244, 2.2);
-  emis("emissiveGreen", 0x39ff88, 1.4);
-  emis("emissiveBlue", 0x2b6bff, 1.4);
-}
-
-export function mat(name: MatName): THREE.Material {
-  const m = mats.get(name);
-  if (!m) throw new Error(`Material not found: ${name}`);
-  return m;
-}
-
-export function standard(name: MatName): THREE.MeshStandardMaterial {
-  return mat(name) as THREE.MeshStandardMaterial;
-}
-
-/** Clone helper for per-instance tinting without mutating the shared material. */
-export function tinted(name: MatName, color: number): THREE.MeshStandardMaterial {
-  const base = standard(name);
-  const c = base.clone();
-  c.color.set(color);
-  return c;
-}
-
-export function emissiveSurface(color: number, intensity = 2): THREE.MeshStandardMaterial {
-  const m = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: color, emissiveIntensity: intensity });
-  return m;
+  return {
+    hull, hullDark, deck, deckPlate, trim, rubber, chrome, brushed, copper,
+    padding, warnStripe, screenDark, glass, glassTint, smartGlass,
+    rock, stone, ground, foliage, water,
+    accent, glow, screen,
+    dispose() {
+      for (const m of owned) m.dispose();
+      cache.clear();
+    },
+  };
 }

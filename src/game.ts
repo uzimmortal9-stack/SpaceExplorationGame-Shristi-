@@ -1,745 +1,737 @@
-import * as THREE from "three";
-import { Renderer } from "./core/renderer";
-import { Input } from "./core/input";
-import { audio } from "./core/audio";
-import { initMaterials, mat, emissiveSurface } from "./world/materials";
-import { CollisionWorld } from "./systems/collision";
-import { InteractionSystem } from "./systems/interact";
-import { PlayerController } from "./systems/player";
-import { ShipInterior } from "./world/ship";
-import { ShipExterior } from "./world/exterior";
-import { SolarSystem, Target } from "./world/solar";
-import { Jungle } from "./world/jungle";
-import { FlightSystem } from "./systems/flight";
-import { WarpSystem } from "./systems/warp";
-import { LandingSystem } from "./systems/landing";
-import { Hud } from "./ui/hud";
-import { SaveSystem } from "./systems/save";
-import { damp } from "./core/math";
+/**
+ * Game — the orchestrator.
+ *
+ * Owns the two scenes (ship interior + space, and the planet surface), the
+ * phase machine that walks the player through the full loop, and the frame
+ * update order. Systems stay independent; this file is the only place that
+ * knows how they compose.
+ *
+ * Loop: interior → pilot seat → flight → target → warp → entry → landing →
+ *       ramp → alien jungle → signal → resolution.
+ */
 
-type State = "loading" | "menu" | "explore" | "flight" | "warp" | "orbit" | "landing" | "planet" | "paused";
+import {
+  Color,
+  Fog,
+  Group,
+  Object3D,
+  Quaternion,
+  Scene,
+  Vector3,
+} from 'three';
 
-const SEAT_LOCAL = new THREE.Vector3(0, 1.5, -9.2);
-const SHIP_START = new THREE.Vector3(40, 0, 0);
+import { AssetLoader } from './assets/assetLoader';
+import { AudioEngine } from './core/audio';
+import { Input } from './core/input';
+import { clamp, lerp } from './core/math';
+import { Renderer, type QualityLevel } from './core/renderer';
+import { GameState } from './core/state';
+import { CollisionWorld } from './systems/collision';
+import { DescentSystem } from './systems/descent';
+import { FlightSystem } from './systems/flight';
+import { InteractionSystem } from './systems/interaction';
+import { Player } from './systems/player';
+import { WarpSystem } from './systems/warp';
+import { Hud, type NavOption } from './ui/hud';
+import { createMaterials, type MaterialLibrary } from './world/materials';
+import { Planet, PAD, SIGNAL, TERRAIN_SIZE } from './world/planet';
+import { Ship } from './world/ship/ship';
+import { PILOT_SEAT, SPAWN, ROOM_TELEPORTS } from './world/ship/layout';
+import { ShipExterior } from './world/shipExterior';
+import { SolarSystem } from './world/space';
+
+const LIBS: Array<[string, string, string]> = [
+  ['three.js r180', 'MIT', 'WebGL2 renderer, glTF loading, post-processing'],
+  ['Vite 7', 'MIT', 'Dev server and production bundler'],
+  ['TypeScript 5.9', 'Apache-2.0', 'Typed source'],
+];
 
 export class Game {
-  private renderer: Renderer;
-  private input: Input;
-  private hud = new Hud();
-  private collision = new CollisionWorld();
-  private interact = new InteractionSystem();
+  private readonly renderer: Renderer;
+  private readonly input: Input;
+  private readonly audio = new AudioEngine();
+  private readonly state = new GameState();
+  private readonly interact = new InteractionSystem();
 
-  private shipGroup = new THREE.Group();
-  private interior!: ShipInterior;
+  private assets!: AssetLoader;
+  private mats!: MaterialLibrary;
+  private hud!: Hud;
+
+  /** Scene A: the ship (interior + exterior) and the solar system. */
+  private readonly shipScene = new Scene();
+  /** Scene B: the planet surface. */
+  private readonly planetScene = new Scene();
+
+  private ship!: Ship;
   private exterior!: ShipExterior;
-  private solar!: SolarSystem;
-  private jungle!: Jungle;
-
-  private player!: PlayerController;
+  private system!: SolarSystem;
+  private planet!: Planet;
   private flight!: FlightSystem;
-  private warp = new WarpSystem();
-  private landing!: LandingSystem;
+  private warp!: WarpSystem;
+  private descent!: DescentSystem;
+  private player!: Player;
 
-  private state: State = "loading";
+  /** Collision world currently in use (ship or planet). */
+  private activeCollision!: CollisionWorld;
+  private surfaceCollision = new CollisionWorld();
+
+  /** The ship's transform in the planet scene once landed. */
+  private readonly landedOrigin = new Vector3(PAD.x, 0, PAD.z - 40);
+
+  private raf = 0;
+  private running = false;
   private paused = false;
-  private elapsed = 0;
-  private target: Target | null = null;
-  private throttleArmed = false;
-  private coverOpen = false;
-  private rampLowered = false;
-  private gearDeployed = false;
-  private controlsShown = false;
-  private signalFound = false;
-  private sat = false;
-  private qaTurbo = false;
-  private planetActive = false;
+  private controlsSeen = false;
+  private lastTime = 0;
+  private fpsAccum = 0;
+  private fpsFrames = 0;
+  private fps = 60;
+  private onSurface = false;
+  private restFade = 0;
 
-  private starfield: THREE.Points;
-  private dome: THREE.Mesh;
-  private virtualShip = SHIP_START.clone();
-  private menuAngle = 0;
+  constructor(private readonly mount: HTMLElement) {
+    const canvas = document.createElement('canvas');
+    canvas.className = 'game-canvas';
+    mount.append(canvas);
 
-  constructor() {
-    initMaterials();
-    this.renderer = new Renderer();
-    this.input = new Input(this.renderer.renderer.domElement);
-    this.starfield = this.renderer.createStarfield();
-    this.dome = this.renderer.createSpaceDome();
-    this.hud.onStart = () => this.startMission();
-    this.hud.onResume = () => this.togglePause();
-    this.buildWorld();
-    this.wireSignals();
-    this.buildPlayer();
-    this.landing = new LandingSystem(this.shipGroup, this.renderer.scene, this.jungle.root, this.planetObject());
-    this.startGameLoop();
-    this.showMainMenu();
-    this.installDebug();
+    this.renderer = new Renderer(canvas);
+    this.input = new Input(canvas);
+
+    window.addEventListener('resize', () => this.renderer.resize());
+  }
+
+  // ------------------------------------------------------------------- boot
+
+  async boot(onProgress: (v: number, label: string) => void): Promise<void> {
+    this.assets = new AssetLoader(this.renderer);
+
+    onProgress(0.02, 'Reading asset manifest');
+    await this.assets.loadManifest();
+
+    onProgress(0.06, 'Loading models');
+    await this.assets.loadAll((done, total, label) => {
+      onProgress(0.06 + (done / Math.max(total, 1)) * 0.7, `Loading ${label}`);
+    });
+
+    onProgress(0.78, 'Building materials');
+    this.mats = createMaterials(this.assets);
+
+    onProgress(0.8, 'Loading environment lighting');
+    await this.setupEnvironments();
+
+    onProgress(0.86, 'Assembling the Aurora Drift');
+    this.buildShipScene();
+
+    onProgress(0.94, 'Generating Ilex Prime');
+    this.buildPlanetScene();
+
+    onProgress(0.97, 'Wiring interface');
+    this.buildHud();
+    this.wireEvents();
+
+    this.renderer.setScene(this.shipScene);
+    this.activeCollision = this.ship.collision;
+    onProgress(1, 'Ready');
+  }
+
+  private async setupEnvironments(): Promise<void> {
+    const interiorUrl = this.assets.environmentUrl('interior_1k');
+    const spaceUrl = this.assets.environmentUrl('space_night_1k');
+    const planetUrl = this.assets.environmentUrl('planet_sky_1k');
+
+    // The ship scene uses an interior-ish HDRI so metal has something to
+    // reflect; the deep-space HDRI is far too dark to carry the interiors.
+    const interiorEnv = interiorUrl ? await this.renderer.loadEnvironment(interiorUrl) : null;
+    if (interiorEnv) {
+      this.shipScene.environment = interiorEnv;
+      this.shipScene.environmentIntensity = 0.42;
+    }
+    if (spaceUrl) {
+      const spaceEnv = await this.renderer.loadEnvironment(spaceUrl);
+      if (spaceEnv) this.shipScene.userData.spaceEnv = spaceEnv;
+    }
+    this.shipScene.background = new Color(0x03050a);
+
+    const planetEnv = planetUrl ? await this.renderer.loadEnvironment(planetUrl) : null;
+    if (planetEnv) {
+      this.planetScene.environment = planetEnv;
+      this.planetScene.environmentIntensity = 0.85;
+    }
+  }
+
+  private buildShipScene(): void {
+    this.system = new SolarSystem(this.assets);
+    this.shipScene.add(this.system.group);
+
+    this.ship = new Ship({
+      assets: this.assets,
+      mats: this.mats,
+      audio: this.audio,
+      state: this.state,
+      interact: this.interact,
+      profile: this.renderer.qualityProfile,
+    });
+    this.shipScene.add(this.ship.group);
+
+    this.exterior = new ShipExterior(this.assets, this.mats);
+    this.exterior.setVisible(false);
+    this.shipScene.add(this.exterior.group);
+
+    this.player = new Player(this.renderer.camera, this.ship.collision, this.audio);
+    this.shipScene.add(this.player.lamp, this.player.lamp.target);
+    this.player.teleport(SPAWN.x, SPAWN.y, SPAWN.z, SPAWN.yaw);
+
+    this.flight = new FlightSystem(this.renderer.camera, this.audio, this.state);
+    this.warp = new WarpSystem(this.renderer, this.audio, this.state);
+    this.shipScene.add(this.warp.group);
+
+    this.descent = new DescentSystem(
+      this.renderer.camera, this.renderer, this.audio, this.state, this.exterior,
+    );
+  }
+
+  private buildPlanetScene(): void {
+    this.planet = new Planet({
+      assets: this.assets,
+      mats: this.mats,
+      collision: this.surfaceCollision,
+      interact: this.interact,
+      audio: this.audio,
+      state: this.state,
+      profile: this.renderer.qualityProfile,
+    });
+    this.planetScene.add(this.planet.group);
+    this.planetScene.fog = this.planet.fog;
+    this.planetScene.background = new Color(0x7fc6d8);
+  }
+
+  private buildHud(): void {
+    this.hud = new Hud(this.state, {
+      onResume: () => this.resume(),
+      onOpenSettings: () => this.hud.show('settings'),
+      onOpenControls: () => this.hud.show('controls'),
+      onOpenCredits: () => this.hud.show('credits'),
+      onQuit: () => window.location.reload(),
+      onSelectTarget: (id) => this.selectTarget(id),
+      onQualityChange: (q) => this.setQuality(q),
+      onVolumeChange: (bus, v) => this.audio.setVolume(bus, v),
+      onSensitivityChange: (v) => { this.input.sensitivity = v; },
+      onInvertY: (v) => { this.input.invertY = v; },
+    });
+    this.mount.append(this.hud.root);
+    this.hud.setCredits(this.assets.creditRows(), this.assets.missing, LIBS);
+    this.refreshNav();
+  }
+
+  private wireEvents(): void {
+    window.addEventListener('aurora:sit', () => this.sitInPilotSeat());
+    window.addEventListener('aurora:opennav', () => this.openNav());
+    window.addEventListener('aurora:warp', () => this.engageWarp());
+    window.addEventListener('aurora:signal', () => this.onSignalFound());
+    window.addEventListener('aurora:rest', () => { this.restFade = 1.6; });
+    window.addEventListener('aurora:alert', (e) => {
+      this.ship.lights.setAlert(Boolean((e as CustomEvent).detail));
+    });
+
+    document.addEventListener('pointerlockchange', () => {
+      if (!this.input.pointerLocked && this.running && !this.hud.isOpen() && !this.state.cinematic) {
+        this.pause();
+      }
+    });
+  }
+
+  // ------------------------------------------------------------------- start
+
+  async start(): Promise<void> {
+    await this.audio.unlock();
+    this.ship.startAmbience();
+
+    this.state.setPhase('interior');
+    this.state.setObjectives([
+      { id: 'briefing', text: 'Review the mission briefing in Comms', done: false },
+      { id: 'throttle', text: 'Arm the main drive on the bridge', done: false },
+      { id: 'sit', text: 'Take the pilot seat', done: false },
+    ]);
+    this.state.pushSystems();
+
+    if (!this.controlsSeen) {
+      this.controlsSeen = true;
+      this.hud.show('controls');
+    } else {
+      this.input.requestPointerLock();
+    }
+
+    this.running = true;
+    this.lastTime = performance.now();
+    this.loop();
+  }
+
+  resume(): void {
+    this.paused = false;
+    this.hud.hideAll();
+    this.input.enabled = true;
+    this.input.requestPointerLock();
+  }
+
+  pause(): void {
+    if (this.state.cinematic) return;
+    this.paused = true;
+    this.input.exitPointerLock();
+    this.hud.show('pause');
+  }
+
+  private setQuality(q: QualityLevel): void {
+    this.renderer.applyQuality(q);
+    this.audio.uiClick();
+  }
+
+  // ---------------------------------------------------------------- gameplay
+
+  private sitInPilotSeat(): void {
+    if (this.player.mode !== 'walking') return;
+    if (!this.state.throttleUnlocked) {
+      this.audio.uiDenied();
+      this.state.toast('Open the throttle safety lid and arm the drive first', 'warn');
+      return;
+    }
+
+    const seatWorld = new Vector3(PILOT_SEAT.x, 1.32, PILOT_SEAT.z + 0.15);
+    this.player.sit(
+      {
+        position: seatWorld,
+        yaw: Math.PI,
+        pitch: 0,
+        exit: new Vector3(PILOT_SEAT.x + 1.4, 0, PILOT_SEAT.z + 1.6),
+      },
+      () => {
+        this.state.completeObjective('sit');
+        if (this.onSurface) {
+          // sitting down on the ground does not re-launch the ship
+          this.state.toast('Systems idle. The Aurora Drift is grounded.', 'info');
+          return;
+        }
+        this.state.setPhase('flight');
+        this.flight.begin(new Vector3(0, 0, 0), new Quaternion());
+        this.exterior.setVisible(true);
+        this.state.toast('Flight control transferred', 'good');
+        this.state.subtitle('Throttle on W. Nose follows the mouse. Press M to pick a destination.', 7);
+        this.state.addObjective({ id: 'target', text: 'Lock a destination with the nav hologram [M]', done: false });
+      },
+    );
+  }
+
+  private standFromSeat(): void {
+    if (!this.player.isSeated) return;
+    this.player.stand(() => {
+      if (!this.onSurface) {
+        this.state.setPhase('interior');
+        this.flight.end();
+        this.exterior.setVisible(false);
+      }
+    });
+  }
+
+  private openNav(): void {
+    this.refreshNav();
+    this.hud.show('nav');
+    this.input.exitPointerLock();
+    this.audio.uiClick();
+  }
+
+  private refreshNav(): void {
+    const origin = this.flight.active ? this.flight.position : new Vector3();
+    const options: NavOption[] = this.system.bodies
+      .filter((b) => b.kind !== 'star')
+      .map((b) => ({
+        id: b.id,
+        name: b.name,
+        kind: b.kind,
+        distance: origin.distanceTo(b.position),
+        description: b.description,
+        color: b.color,
+        landable: b.landable,
+      }))
+      .sort((a, b) => a.distance - b.distance);
+    this.hud.setNavOptions(options);
+  }
+
+  private selectTarget(id: string): void {
+    const body = this.system.get(id);
+    if (!body) return;
+    const origin = this.flight.active ? this.flight.position : new Vector3();
+    this.state.setTarget({
+      id: body.id,
+      name: body.name,
+      kind: body.kind,
+      distance: origin.distanceTo(body.position),
+      canWarp: true,
+    });
+    this.audio.targetLock();
+    this.state.completeObjective('target');
+
+    if (body.landable) {
+      this.state.toast(`Destination locked: ${body.name}`, 'good');
+      this.state.addObjective({ id: 'arm_warp', text: 'Arm the warp drive from the bridge console', done: false });
+    } else {
+      this.state.toast(`${body.name} locked — no landing site`, 'warn');
+      this.state.subtitle('No surface access there. The signal comes from Ilex Prime.', 5);
+    }
+
+    // arming the drive starts the physical spin-up in the warp room
+    if (this.warp.stage === 'idle') this.warp.beginCharge();
+  }
+
+  private engageWarp(): void {
+    if (!this.state.target) {
+      this.audio.uiDenied();
+      return;
+    }
+    const started = this.warp.engage(() => this.onWarpArrive());
+    if (!started) {
+      this.state.toast('Warp core still charging', 'warn');
+      return;
+    }
+    this.state.setPhase('warpTunnel');
+    this.state.setCinematic(true);
+    this.ship.lights.setPulse(1);
+
+    // If the player pulled the lever while standing in the engine room, ride
+    // the jump from there; the camera stays first person and shakes hard.
+    this.state.subtitle('Field geometry stable. Engaging.', 4);
+  }
+
+  private onWarpArrive(): void {
+    this.ship.lights.setPulse(0);
+    const target = this.state.target ? this.system.get(this.state.target.id) : null;
+    this.state.toast(`Arrived: ${target?.name ?? 'destination'}`, 'good');
+    this.state.completeObjective('pull_lever');
+
+    if (!target?.landable) {
+      this.state.setCinematic(false);
+      this.state.setPhase(this.player.isSeated ? 'flight' : 'interior');
+      this.state.subtitle('Arrival complete. No landing site here.', 5);
+      return;
+    }
+
+    // Place the ship on an approach vector and begin the descent cinematic.
+    this.state.setPhase('entry');
+    this.beginDescent();
+  }
+
+  private beginDescent(): void {
+    // Move to the planet scene for the whole entry so the terrain is genuinely
+    // beneath the ship as it falls.
+    this.renderer.setScene(this.planetScene);
+    this.planetScene.add(this.exterior.group);
+    this.planetScene.add(this.descent.group);
+    this.exterior.setVisible(true);
+    this.exterior.group.position.set(PAD.x, 26000, PAD.z);
+    this.descent.padPosition.copy(this.landedOrigin);
+
+    this.state.setCinematic(true);
+    this.descent.begin(() => this.onLanded());
+  }
+
+  private onLanded(): void {
+    this.state.setPhase('landed');
+    this.state.hasLanded = true;
+    this.onSurface = true;
+
+    // Move the ship interior into the planet scene, positioned at the pad, so
+    // the player can walk out of it onto the surface with no loading screen.
+    this.planetScene.add(this.ship.group);
+    this.ship.group.position.copy(this.landedOrigin);
+    this.ship.group.rotation.y = 0;
+    this.planetScene.add(this.player.lamp, this.player.lamp.target);
+
+    this.exterior.group.position.copy(this.landedOrigin);
+    this.exterior.group.rotation.set(0, 0, 0);
+
+    // The ship's local collision world must be offset into planet coordinates.
+    this.activeCollision = this.ship.collision;
+    this.state.setCinematic(false);
+
+    // Stand the player up in the pilot seat's exit position, in world space.
+    this.player.mode = 'walking';
+    this.player.teleport(
+      this.landedOrigin.x + PILOT_SEAT.x + 1.4,
+      this.landedOrigin.y,
+      this.landedOrigin.z + PILOT_SEAT.z + 1.8,
+      0,
+    );
+    this.flight.end();
+
+    this.state.toast('Touchdown confirmed', 'good');
+    this.state.addObjective({ id: 'ramp', text: 'Lower the boarding ramp in the Cargo Bay', done: false });
+    this.state.addObjective({ id: 'signal', text: 'Find the source of the signal', done: false });
+    this.state.subtitle('Engines cooling. Atmosphere is breathable. The ramp is at the stern.', 7);
+
+    this.audio.setLoopGain('ship_hum', 0.28, 3);
+    this.audio.loop('wind', 'wind', 'ambient');
+  }
+
+  private onSignalFound(): void {
+    this.state.setPhase('surface');
+    window.setTimeout(() => {
+      this.state.subtitle(
+        'You have your answer. Somewhere behind you the Aurora Drift is still humming, waiting to carry it home.',
+        10,
+      );
+      this.state.toast('MISSION COMPLETE — return to the ship when ready', 'good');
+      this.state.addObjective({ id: 'return', text: 'Return to the Aurora Drift', done: false });
+    }, 9000);
+  }
+
+  // -------------------------------------------------------------------- loop
+
+  private loop = (): void => {
+    if (!this.running) return;
+    this.raf = requestAnimationFrame(this.loop);
+
+    const now = performance.now();
+    let dt = (now - this.lastTime) / 1000;
+    this.lastTime = now;
+    dt = Math.min(dt, 0.05);
+
+    this.fpsAccum += dt;
+    this.fpsFrames++;
+    if (this.fpsAccum >= 0.5) {
+      this.fps = this.fpsFrames / this.fpsAccum;
+      this.fpsAccum = 0;
+      this.fpsFrames = 0;
+      this.hud.setFps(this.fps, this.renderer.info.render.triangles);
+    }
+
+    this.update(dt);
+    this.renderer.render();
+    this.input.endFrame();
+  };
+
+  private update(dt: number): void {
+    const overlayOpen = this.hud.isOpen();
+    const cinematic = this.state.cinematic;
+    const canAct = !this.paused && !overlayOpen && !cinematic;
+
+    // ---- global keys --------------------------------------------------------
+    if (this.input.keyPressed('Escape')) {
+      if (overlayOpen) this.resume();
+      else if (!cinematic) this.pause();
+    }
+    if (canAct && this.input.keyPressed('KeyM') && !this.onSurface) this.openNav();
+
+    // ---- systems ------------------------------------------------------------
+    this.system.update(dt);
+    this.hud.update(dt);
+
+    if (this.restFade > 0) {
+      this.restFade -= dt;
+      this.hud.fadeTo(this.restFade > 0.2 ? 1 : 0);
+      if (this.restFade <= 0) this.hud.fadeTo(0);
+    }
+
+    // ---- descent cinematic owns the camera ----------------------------------
+    if (this.descent.isActive) {
+      this.descent.update(dt);
+      this.planet.update(dt, this.renderer.camera.position);
+      this.applyShake(dt);
+      return;
+    }
+
+    // ---- flight -------------------------------------------------------------
+    if (this.state.phase === 'flight' || this.warp.isActive) {
+      if (this.flight.active) {
+        this.flight.update(dt, this.input, canAct && !this.warp.isActive);
+        this.exterior.group.position.copy(this.flight.position);
+        this.exterior.group.quaternion.copy(this.flight.quaternion);
+        this.exterior.setThrust(this.flight.throttle * (this.flight.boosting ? 1 : 0.75));
+        this.exterior.setVisible(this.flight.cameraMode !== 'cockpit');
+        this.exterior.update(dt);
+        this.ship.group.position.copy(this.flight.position);
+        this.ship.group.quaternion.copy(this.flight.quaternion);
+        this.system.aimSunAt(this.flight.position);
+        this.hud.setFlight(this.flight.throttle, this.flight.speed);
+        this.renderer.addShake(this.flight.engineShake, 6);
+
+        if (canAct && this.input.wasPressed('interact') && !this.warp.isActive) {
+          this.standFromSeat();
+        }
+        if (canAct && this.input.wasPressed('gear')) {
+          const next = this.state.systems.landingGear > 0.5 ? 0 : 1;
+          this.state.systems.landingGear = next;
+          this.exterior.setGear(next);
+          this.audio.noiseBurst({ duration: 1.4, gain: 0.24, filter: 700, filterEnd: 220, q: 1.5 });
+          this.state.pushSystems();
+        }
+        if (canAct && this.input.wasPressed('warp') && this.state.warpArmed && this.warp.stage === 'ready') {
+          this.engageWarp();
+        }
+
+        // live distance to target
+        if (this.state.target) {
+          const b = this.system.get(this.state.target.id);
+          if (b) {
+            this.state.target.distance = this.flight.position.distanceTo(b.position);
+            this.state.events.emit('target', this.state.target);
+          }
+        }
+      }
+    }
+
+    // ---- on foot ------------------------------------------------------------
+    const walking = this.player.mode !== 'seated';
+    if (walking) {
+      this.player.update(dt, this.input, canAct);
+    } else {
+      // seated but not flying (e.g. landed): keep the camera stable
+      this.player.update(dt, this.input, canAct);
+    }
+
+    // ---- interaction --------------------------------------------------------
+    if (walking || this.state.phase === 'landed') {
+      const eye = this.renderer.camera.position;
+      this.interact.update(eye, this.renderer.camera.quaternion);
+      const c = this.interact.current;
+      this.hud.setReticle(!cinematic && !overlayOpen);
+      this.hud.setPrompt(c ? c.label : null, c?.detail);
+      if (canAct && this.input.wasPressed('interact')) {
+        if (!this.interact.activate() && this.player.isSeated) this.standFromSeat();
+      }
+    } else {
+      this.hud.setPrompt(null);
+      this.hud.setReticle(false);
+    }
+
+    // ---- world ticks --------------------------------------------------------
+    const playerPos = this.player.position;
+    if (this.onSurface) {
+      // ship interior collision is expressed in local space; feed the player's
+      // position back into ship-local coordinates for door triggers
+      const local = playerPos.clone().sub(this.ship.group.position);
+      this.ship.update(dt, local, 0.34, this.player.height);
+      this.planet.update(dt, this.renderer.camera.position);
+      this.exterior.update(dt);
+      this.exterior.setRampDoor(this.state.systems.rampAngle);
+      this.updateSurfaceCollision();
+      this.checkRampExit();
+    } else {
+      this.ship.update(dt, playerPos, 0.34, this.player.height);
+    }
+
+    this.warp.update(dt, this.flight.position, this.flight.quaternion);
+    this.applyShake(dt);
+    this.state.pushSystems();
   }
 
   /**
-   * QA / debug facade — lets a headless test (or a curious player) jump
-   * directly to any scene. Exposed on window.__voyager.
+   * On the surface the player can be inside the ship (ship-local colliders,
+   * offset into world space) or outside on the terrain. Swap the active
+   * collision world based on where they are.
    */
-  private installDebug(): void {
-    const self = this;
-    const qa = {
-      scene: (name: string) => self.qaScene(name),
-      getState: () => self.state,
-      setTurbo: (v: boolean) => (self.qaTurbo = v),
+  private updateSurfaceCollision(): void {
+    const p = this.player.position;
+    const local = p.clone().sub(this.ship.group.position);
+    const insideHull =
+      local.x > -17 && local.x < 17 && local.z > -32 && local.z < 82 && p.y < 6;
+
+    if (insideHull && this.activeCollision !== this.ship.collision) {
+      this.activeCollision = this.ship.collision;
+      this.rebindPlayerCollision(this.ship.collision, this.ship.group.position);
+    } else if (!insideHull && this.activeCollision !== this.surfaceCollision) {
+      this.activeCollision = this.surfaceCollision;
+      this.rebindPlayerCollision(this.surfaceCollision, new Vector3());
+    }
+  }
+
+  private collisionOffset = new Vector3();
+
+  private rebindPlayerCollision(world: CollisionWorld, offset: Vector3): void {
+    this.collisionOffset.copy(offset);
+    // The Player holds a direct reference; swap it via a small proxy so the
+    // controller keeps working in world space either way.
+    (this.player as unknown as { collision: CollisionWorld }).collision =
+      offset.lengthSq() < 1e-6 ? world : this.makeOffsetWorld(world, offset);
+  }
+
+  private makeOffsetWorld(world: CollisionWorld, offset: Vector3): CollisionWorld {
+    // Wrap the ship's local collision world so world-space queries work while
+    // the hull sits at an arbitrary position on the planet.
+    const proxy = Object.create(world) as CollisionWorld;
+    const o = offset.clone();
+    proxy.move = (position, velocity, radius, height, dt, step) => {
+      const localPos = position.clone().sub(o);
+      const res = world.move(localPos, velocity, radius, height, dt, step);
+      res.position.add(o);
+      return res;
     };
-    (window as any).__voyager = qa;
+    proxy.overlaps = (position, radius, height, skip) =>
+      world.overlaps(position.clone().sub(o), radius, height, skip);
+    proxy.surfaceAt = (x, z) => world.surfaceAt(x - o.x, z - o.z);
+    return proxy;
   }
 
-  private qaScene(name: string): void {
-    this.hud.hideMainMenu();
-    this.hud.hidePause();
-    this.hud.hideEndScreen();
-    this.hud.hideLoading();
-    this.hud.hideFlight();
-    switch (name) {
-      case "menu":
-        this.showMainMenu();
-        break;
-      case "interior": {
-        this.state = "explore";
-        this.sat = false;
-        this.ensureCameraChild(false);
-        this.player.teleport(0, 0, 0, Math.PI);
-        this.renderer.camera.position.copy(this.player.eyePos);
-        this.renderer.camera.rotation.set(0, 0, 0);
-        this.renderer.camera.rotateY(Math.PI);
-        this.renderer.camera.rotateX(-0.1);
-        this.starfield.visible = true;
-        break;
-      }
-      case "bridge": {
-        this.state = "explore";
-        this.sat = false;
-        this.ensureCameraChild(false);
-        this.player.teleport(-1.5, 0, -9.5, Math.PI);
-        this.renderer.camera.position.copy(this.player.eyePos);
-        this.renderer.camera.rotation.set(0, 0, 0);
-        this.renderer.camera.rotateY(Math.PI);
-        this.renderer.camera.rotateX(-0.05);
-        this.starfield.visible = true;
-        break;
-      }
-      case "flight": {
-        this.state = "flight";
-        this.sat = true;
-        this.flight = this.flight ?? new FlightSystem(this.shipGroup);
-        this.flight.sitIn(this.renderer.camera);
-        this.flight.mode = "cockpit";
-        this.shipGroup.quaternion.identity();
-        this.shipGroup.position.set(0, 0, 0);
-        this.virtualShip.copy(SHIP_START);
-        this.updateSolarOffset();
-        this.hud.showFlight();
-        this.starfield.visible = true;
-        break;
-      }
-      case "chase": {
-        this.qaScene("flight");
-        this.flight.mode = "chase";
-        break;
-      }
-      case "orbital": {
-        this.qaScene("flight");
-        this.flight.mode = "orbital";
-        break;
-      }
-      case "warp": {
-        this.state = "warp";
-        this.ensureCameraChild(true);
-        this.renderer.camera.position.set(0, 1.5, -9.2);
-        this.renderer.camera.quaternion.identity();
-        this.warp.start(this.solar.jungle.position, () => {
-          this.virtualShip.copy(this.solar.jungle.position).add(new THREE.Vector3(0, 0, 160));
-          this.updateSolarOffset();
-          this.state = "orbit";
-        });
-        this.starfield.visible = true;
-        break;
-      }
-      case "landing": {
-        this.beginLanding();
-        break;
-      }
-      case "planet": {
-        this.activatePlanet();
-        this.player.teleport(8, 2, 4, Math.PI);
-        break;
-      }
-      case "pool": {
-        this.activatePlanet();
-        const p = this.jungle.poolPos;
-        this.player.teleport(p.x - 6, 3, p.z - 4, Math.PI * 0.9);
-        break;
-      }
+  /** Walking down the open ramp hands the player to the terrain. */
+  private checkRampExit(): void {
+    if (this.state.systems.rampAngle < 0.85) return;
+    const local = this.player.position.clone().sub(this.ship.group.position);
+    if (local.z > 84 && this.state.phase !== 'surface') {
+      this.state.setPhase('surface');
+      this.state.toast('Ilex Prime — surface pressure nominal', 'good');
+      this.state.subtitle('Warm, wet air. Everything here is the wrong shade of green.', 6);
     }
   }
 
-  private planetObject(): THREE.Object3D {
-    return this.solar.jungleMesh ?? new THREE.Object3D();
-  }
-
-  private buildWorld(): void {
-    const scene = this.renderer.scene;
-    // ship group: interior + exterior
-    scene.add(this.shipGroup);
-    this.interior = new ShipInterior(this.collision, this.interact, {
-      onPilotSeat: () => this.sitInPilot(),
-      onStand: () => this.standUp(),
-      onThrottle: () => this.pressThrottle(),
-      onWarpLever: () => this.pullWarpLever(),
-      onSitSeat: () => undefined,
-    });
-    this.shipGroup.add(this.interior.root);
-    this.exterior = new ShipExterior();
-    this.exterior.setRamp(this.interior.ramp);
-    this.exterior.setGearDeployed(false);
-    this.exterior.setVisible(false);
-    this.shipGroup.add(this.exterior.root);
-
-    // solar system
-    this.solar = new SolarSystem();
-    scene.add(this.solar.root);
-    scene.add(this.solar.sunLight);
-    // enable the sun as the primary key light for space / hull / planet
-    this.solar.sunLight.position.set(400, 220, 180);
-    this.solar.sunLight.target.position.set(0, 0, 0);
-    this.solar.sunLight.intensity = 2.6;
-    scene.add(this.solar.sunLight.target);
-    // soft fill so interiors and shadows aren't pitch black
-    const hemi = new THREE.HemisphereLight(0xcfe0ff, 0x1a2430, 0.85);
-    scene.add(hemi);
-    const hemi2 = new THREE.HemisphereLight(0xffffff, 0x000000, 0.35);
-    scene.add(hemi2);
-
-    // jungle (hidden until landing)
-    this.jungle = new Jungle(this.collision);
-    this.jungle.root.visible = false;
-    scene.add(this.jungle.root);
-
-    this.updateSolarOffset();
-  }
-
-  private buildPlayer(): void {
-    this.player = new PlayerController(this.collision, this.input);
-    this.player.teleport(0, 0, -4, 0);
-  }
-
-  private wireSignals(): void {
-    // nothing extra
-  }
-
-  private updateSolarOffset(): void {
-    this.solar.root.position.copy(this.virtualShip.clone().negate());
-  }
-
-  private showMainMenu(): void {
-    this.state = "menu";
-    this.hud.showMainMenu();
-    void this.renderer.setEnvironment("space");
-    this.renderer.setBackgroundColor(0x000000);
-    this.starfield.visible = true;
-  }
-
-  private async startMission(): Promise<void> {
-    this.hud.hideMainMenu();
-    this.hud.showLoading("INITIALIZING SHIP SYSTEMS...");
-    await this.renderer.setEnvironment("space");
-    this.hud.hideLoading();
-    this.state = "explore";
-    this.renderer.setBackgroundColor(0x000000);
-    this.starfield.visible = true;
-    this.input.requestLock();
-    this.showObjective();
-    if (!this.controlsShown) {
-      this.controlsShown = true;
-      this.hud.openControls();
-      SaveSystem.save({ started: true, controlsSeen: true, state: "explore", player: { x: 0, y: 0, z: -4, yaw: 0 }, shipPosition: { x: 0, y: 0, z: 0 }, targetId: null, warpSeen: false });
-    }
-  }
-
-  private showObjective(): void {
-    if (this.state === "explore") this.hud.setObjective("Explore the Aurora Voyager. Reach the bridge and sit in the pilot seat.");
-    else if (this.state === "flight" || this.state === "orbit")
-      this.hud.setObjective("Select a target [T], open the red cover and pull the warp lever to jump to Lumis Prime.");
-    else if (this.state === "planet") this.hud.setObjective("Follow the signal to the bioluminescent pool and ancient ruins.");
-  }
-
-  private sitInPilot(): void {
-    if (this.state !== "explore" && this.state !== "planet") return;
-    this.sat = true;
-    this.state = "flight";
-    this.flight = this.flight ?? new FlightSystem(this.shipGroup);
-    this.flight.sitIn(this.renderer.camera);
-    this.shipGroup.quaternion.identity();
-    this.shipGroup.position.set(0, 0, 0);
-    this.virtualShip.copy(SHIP_START);
-    this.updateSolarOffset();
-    this.flight.mode = "cockpit";
-    this.hud.showFlight();
-    this.showObjective();
-    this.input.requestLock();
-    this.renderer.camera.fov = 70;
-    this.renderer.camera.updateProjectionMatrix();
-    audio.click();
-  }
-
-  private standUp(): void {
-    if (this.state !== "flight" && this.state !== "orbit") return;
-    this.sat = false;
-    this.state = this.landing.phase === "landed" ? "planet" : "explore";
-    this.flight.stand(this.renderer.camera);
-    // place player near pilot seat (ship is at origin in explore)
-    const p = SEAT_LOCAL.clone().add(this.shipGroup.position);
-    this.player.teleport(p.x, 0, p.z, Math.PI);
-    this.hud.hideFlight();
-    if (this.state === "planet") {
-      this.activatePlanet();
-    }
-    this.input.requestLock();
-  }
-
-  private ensureCameraChild(child: boolean): void {
-    const scene = this.renderer.scene;
+  private applyShake(dt: number): void {
+    const s = this.renderer.sampleShake(dt);
+    if (s.x === 0 && s.y === 0) return;
     const cam = this.renderer.camera;
-    const inShip = this.shipGroup.children.includes(cam);
-    const inScene = scene.children.includes(cam);
-    if (child && !inShip) {
-      if (inScene) scene.remove(cam);
-      this.shipGroup.add(cam);
-    } else if (!child && !inScene) {
-      if (inShip) this.shipGroup.remove(cam);
-      scene.add(cam);
-    }
+    cam.position.x += s.x;
+    cam.position.y += s.y;
+    cam.rotateZ(s.roll * 0.35);
   }
 
-  private pressThrottle(): void {
-    if (!this.sat) {
-      this.hud.showMessage("Requires pilot seat.");
-      return;
-    }
-    if (!this.throttleArmed) {
-      this.throttleArmed = true;
-      audio.switchHit();
-      this.hud.showMessage("Safety lid opened — throttle armed. Hold W to accelerate.");
-    } else {
-      this.throttleArmed = false;
-      audio.switchHit();
-      this.hud.showMessage("Throttle disengaged.");
-    }
+  stop(): void {
+    this.running = false;
+    cancelAnimationFrame(this.raf);
+    this.input.dispose();
+    this.audio.dispose();
+    this.renderer.dispose();
   }
 
-  private pullWarpLever(): void {
-    if (!this.sat) {
-      this.hud.showMessage("Requires pilot seat.");
-      return;
-    }
-    if (this.state === "warp") return;
-    if (!this.target) {
-      this.target = this.solar.jungle;
-      this.hud.showMessage("Target set to Lumis Prime. Pull lever again to warp.");
-      return;
-    }
-    if (!this.coverOpen) {
-      this.coverOpen = true;
-      this.interior.setWarpCover(true);
-      audio.clunk();
-      this.hud.showMessage("Red cover opened — pull the lever to jump.");
-      return;
-    }
-    // engage warp
-    this.coverOpen = false;
-    this.interior.setWarpCover(false);
-    this.startWarp();
-  }
+  // ------------------------------------------------------------------ debug
 
-  private startWarp(): void {
-    this.state = "warp";
-    audio.clunk();
-    this.hud.showMessage("WARP DRIVE SPIN-UP");
-    const target = this.target ?? this.solar.jungle;
-    this.warp.start(target.position, () => {
-      // place ship in orbit ahead of the target planet (ship forward = -Z)
-      this.virtualShip.copy(target.position).add(new THREE.Vector3(0, 0, 160));
-      this.updateSolarOffset();
-      this.state = "orbit";
-      this.showObjective();
-      this.hud.showMessage("Arrived at " + target.name + ". Descend to enter the atmosphere.");
-    });
-  }
-
-  private activatePlanet(): void {
-    if (this.planetActive) {
-      this.state = "planet";
-      return;
-    }
-    this.planetActive = true;
-    this.landing.stop();
-    // set environment to jungle
-    void this.renderer.setEnvironment("jungle");
-    this.renderer.setBackgroundColor(0x69b8d8);
-    this.starfield.visible = false;
-    this.dome.visible = false;
-    this.exterior.setVisible(true);
-    this.exterior.setGearDeployed(true);
-    this.gearDeployed = true;
-    this.lowerRamp();
-    this.player.setTerrain({
-      heightAt: (x: number, z: number) => this.jungle.heightAt(x, z),
-    });
-    this.player.setMaterial("grass");
-    this.state = "planet";
-    this.showObjective();
-    // signal source interactable
-    const sig = this.signalBeacon();
-    sig.position.set(this.jungle.poolPos.x, 1.2, this.jungle.poolPos.z);
-    this.renderer.scene.add(sig);
-    this.interact.add({
-      object: sig,
-      label: "Inspect Signal Source",
-      range: 3.0,
-      onInteract: () => {
-        if (this.signalFound) return;
-        this.signalFound = true;
-        this.hud.showEndScreen();
-        audio.warpExit();
+  /** Exposed for the developer console; disabled in the shipping UI. */
+  get debug() {
+    return {
+      teleport: (roomId: string) => {
+        const t = ROOM_TELEPORTS.find((r) => r.id === roomId);
+        if (!t) return `unknown room: ${ROOM_TELEPORTS.map((x) => x.id).join(', ')}`;
+        const base = this.onSurface ? this.ship.group.position : new Vector3();
+        this.player.teleport(base.x + t.x, base.y, base.z + t.z, t.yaw);
+        return `→ ${t.label}`;
       },
-    });
+      rooms: () => ROOM_TELEPORTS.map((r) => r.id),
+      land: () => this.beginDescent(),
+      skipWarp: () => this.onWarpArrive(),
+      state: () => this.state,
+      surfaceTeleport: (x: number, z: number) => {
+        this.player.teleport(x, this.planet.heightAt(x, z) + 1, z);
+      },
+      goSignal: () => {
+        this.player.teleport(SIGNAL.x + 6, this.planet.heightAt(SIGNAL.x + 6, SIGNAL.z + 6) + 1, SIGNAL.z + 6);
+      },
+      fps: () => this.fps,
+      assets: () => this.assets.stats,
+    };
   }
 
-  private signalBeacon(): THREE.Group {
-    const g = new THREE.Group();
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 1, 12), mat("rock"));
-    base.position.y = 0.5;
-    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 16), emissiveSurface(0xffaa33, 2.5));
-    tip.position.y = 1.3;
-    g.add(base, tip);
-    g.userData.signal = true;
-    return g;
-  }
-
-  private lowerRamp(): void {
-    if (this.rampLowered) return;
-    this.rampLowered = true;
-    if (this.interior.ramp) {
-      const r = this.interior.ramp;
-      r.rotation.x = -0.42;
-      r.position.y = -0.1;
-    }
-    audio.gearDeploy();
-    this.hud.showMessage("Rear ramp lowered. Step out to explore Lumis Prime.");
-  }
-
-  private togglePause(): void {
-    if (this.state === "paused") {
-      this.state = this.prevState;
-      this.paused = false;
-      this.hud.hidePause();
-      this.input.requestLock();
-    } else {
-      if (this.state === "menu") return;
-      this.prevState = this.state;
-      this.state = "paused";
-      this.paused = true;
-      this.hud.showPause();
-      this.input.exitLock();
-    }
-  }
-  private prevState: State = "explore";
-
-  private startGameLoop(): void {
-    this.renderer.renderer.setAnimationLoop(() => this.frame());
-  }
-
-  private frame(): void {
-    const rawDt = this.elapsed === 0 ? 0 : (performance.now() - this.lastT) / 1000;
-    this.lastT = performance.now();
-    const dt = Math.min(this.qaTurbo ? 1.0 : 0.05, rawDt);
-    this.elapsed += rawDt;
-
-    if (this.state === "menu") {
-      this.menuAngle += dt * 0.1;
-      this.renderer.camera.position.set(Math.sin(this.menuAngle) * 30, 4, Math.cos(this.menuAngle) * 30);
-      this.renderer.camera.lookAt(0, 0, 0);
-      this.renderer.update(dt);
-      this.renderer.render();
-      this.input.endFrame();
-      return;
-    }
-
-    if (this.paused) {
-      this.renderer.render();
-      this.input.endFrame();
-      return;
-    }
-
-    // Esc pause
-    if (this.input.justPressed("escape")) {
-      this.togglePause();
-      this.input.endFrame();
-      return;
-    }
-
-    // resume controls focus
-    if (this.hud.settingsVisible || this.hud.controlsVisible) {
-      this.renderer.update(dt);
-      this.renderer.render();
-      this.hud.tick(dt);
-      this.input.endFrame();
-      return;
-    }
-
-    // HUD back button closes controls -> reacquire
-    if (this.input.justPressed("e") || this.input.justPressed(" ")) {
-      // ignore
-    }
-
-    this.updateState(dt);
-    this.renderer.update(dt);
-    this.renderer.render();
-    this.hud.tick(dt);
-    this.input.endFrame();
-  }
-
-  private lastT = 0;
-
-  private updateState(dt: number): void {
-    switch (this.state) {
-      case "explore":
-        this.updateExplore(dt);
-        break;
-      case "flight":
-      case "orbit":
-        this.updateFlight(dt);
-        break;
-      case "warp":
-        this.updateWarp(dt);
-        break;
-      case "landing":
-        this.updateLanding(dt);
-        break;
-      case "planet":
-        this.updatePlanet(dt);
-        break;
-    }
-  }
-
-  private updateExplore(dt: number): void {
-    const look = this.input.consumeLook();
-    const res = this.player.update(dt, look.yaw, look.pitch);
-    if (res.step) audio.footstep("metal");
-    // keep camera
-    const eye = this.player.eyePos;
-    this.renderer.camera.position.copy(eye);
-    this.renderer.camera.rotation.set(0, 0, 0);
-    this.renderer.camera.rotateY(this.player.yaw);
-    this.renderer.camera.rotateX(this.player.pitch);
-
-    this.interior.update(dt, this.player.pos.x, this.player.pos.z, this.player.radius);
-
-    // interaction
-    const it = this.interact.find(this.renderer.camera);
-    this.hud.setInteraction(it ? it.label : "");
-    if (it && (this.input.justPressed("e") || this.input.mouseJustPressed("left"))) {
-      it.onInteract();
-      audio.click();
-    }
-    if (this.input.justPressed("f")) {
-      const near = this.interact.find(this.renderer.camera);
-      if (near && near.label.includes("Pilot Seat")) this.sitInPilot();
-    }
-  }
-
-  private updateFlight(dt: number): void {
-    this.flight = this.flight ?? new FlightSystem(this.shipGroup);
-    this.flight.update(dt, this.input, this.renderer.camera);
-
-    // target cycling
-    if (this.input.justPressed("t")) {
-      this.cycleTarget();
-    }
-    // camera mode cycling
-    if (this.input.justPressed("c")) {
-      this.flight.mode = this.flight.mode === "cockpit" ? "chase" : this.flight.mode === "chase" ? "orbital" : "cockpit";
-      audio.click();
-    }
-    // stand up
-    if (this.input.justPressed("f")) {
-      this.standUp();
-      this.input.endFrame();
-      return;
-    }
-    // force landing (debug/assist)
-    if (this.input.justPressed("b")) {
-      this.beginLanding();
-      return;
-    }
-
-    // advance virtual ship position (fly through space)
-    const fwd = this.flight.forwardWorld;
-    this.virtualShip.addScaledVector(fwd, this.flight.speed * dt * 2);
-    this.updateSolarOffset();
-
-    // check proximity to target planet for orbit -> landing
-    const target = this.target ?? this.solar.jungle;
-    const dist = this.virtualShip.distanceTo(target.position);
-    const orbiting = dist < 200;
-    if (this.state === "orbit") {
-      if (dist < 130) this.beginLanding();
-    } else if (dist < 220 && target === this.solar.jungle) {
-      this.state = "orbit";
-      this.showObjective();
-      this.hud.showMessage("In orbit around " + target.name + ". Descend to enter atmosphere [or B to auto-land].");
-    }
-
-    // camera
-    if (this.flight.mode === "cockpit") {
-      this.ensureCameraChild(true);
-      this.renderer.camera.position.set(0, 1.5, -9.2);
-      this.renderer.camera.quaternion.identity();
-      this.exterior.setVisible(false);
-    } else {
-      // chase / orbital: camera outside, hull visible
-      this.ensureCameraChild(false);
-      this.exterior.setVisible(true);
-      this.renderer.camera.rotation.set(0, 0, 0);
-      if (this.flight.mode === "chase") {
-        const back = this.flight.forwardWorld.clone().multiplyScalar(24);
-        const up = new THREE.Vector3(0, 6, 0);
-        this.renderer.camera.position.copy(this.shipGroup.position).add(back).add(up);
-        this.renderer.camera.lookAt(this.shipGroup.position);
-      } else {
-        const a = this.elapsed * 0.3;
-        this.renderer.camera.position.set(Math.cos(a) * 30, 10, Math.sin(a) * 30);
-        this.renderer.camera.lookAt(this.shipGroup.position);
-      }
-    }
-
-    // HUD
-    this.hud.showFlight();
-    this.hud.updateFlight({
-      speed: this.flight.speed,
-      throttle: this.flight.throttle,
-      target: target.name,
-      targetDist: dist,
-      warpReady: true,
-      fuel: this.flight.fuel,
-      hull: this.flight.hull,
-      mode: this.flight.mode.toUpperCase(),
-      altitude: 0,
-      orbit: orbiting,
-      gear: this.gearDeployed,
-      warpPhase: "CHG",
-    });
-
-    // interaction (warp lever / throttle) while seated
-    const it = this.interact.find(this.renderer.camera);
-    this.hud.setInteraction(it ? it.label : "");
-    if (it && (this.input.justPressed("e") || this.input.mouseJustPressed("left"))) it.onInteract();
-  }
-
-  private cycleTarget(): void {
-    const list = this.solar.targets.filter((t) => t.type === "planet");
-    if (list.length === 0) return;
-    const idx = list.indexOf(this.target ?? this.solar.jungle);
-    this.target = list[(idx + 1) % list.length];
-    audio.targetLock();
-    this.hud.showMessage("Target: " + this.target.name);
-  }
-
-  private beginLanding(): void {
-    if (this.state === "landing") return;
-    this.state = "landing";
-    this.hud.setCloud(0);
-    this.shipGroup.position.set(0, 170, 0);
-    this.shipGroup.quaternion.identity();
-    this.virtualShip.copy(this.solar.jungle.position);
-    this.updateSolarOffset();
-    this.exterior.setVisible(true);
-    void this.renderer.setEnvironment("jungle");
-    this.renderer.setBackgroundColor(0x9fd0e8);
-    this.starfield.visible = false;
-    this.dome.visible = false;
-    this.landing.start(new THREE.Vector3(0, 0, 0), () => {
-      this.activatePlanet();
-    });
-  }
-
-  private updateWarp(dt: number): void {
-    this.warp.update(dt);
-    this.ensureCameraChild(true);
-    this.renderer.camera.position.set(0, 1.5, -9.2);
-    this.renderer.camera.quaternion.identity();
-    this.exterior.setVisible(false);
-    // apply camera effects
-    this.renderer.camera.fov = damp(this.renderer.camera.fov, this.warp.fov, 4, dt);
-    this.renderer.camera.updateProjectionMatrix();
-    this.hud.setShake(this.warp.shake * 60);
-    this.hud.setCloud(this.warp.tint * 0.25);
-    this.hud.updateFlight({
-      speed: 9999,
-      throttle: 1,
-      target: (this.target ?? this.solar.jungle).name,
-      targetDist: -1,
-      warpReady: false,
-      fuel: this.flight?.fuel ?? 100,
-      hull: this.flight?.hull ?? 100,
-      mode: "WARP",
-      altitude: 0,
-      orbit: false,
-      gear: false,
-      warpPhase: this.warp.phase.toUpperCase(),
-    });
-    if (this.warp.phase === "done") {
-      this.hud.setCloud(0);
-      this.hud.setShake(0);
-    }
-  }
-
-  private updateLanding(dt: number): void {
-    this.landing.update(dt);
-    this.ensureCameraChild(true);
-    // camera stays cockpit (camera is child of shipGroup during flight)
-    this.renderer.camera.position.set(0, 1.5, -9.2);
-    this.renderer.camera.quaternion.identity();
-    this.renderer.camera.fov = damp(this.renderer.camera.fov, 78, 2, dt);
-    this.renderer.camera.updateProjectionMatrix();
-    this.hud.setShake(this.landing.shake * 60 + this.landing.heat * 20);
-    this.hud.setCloud(this.landing.cloud + this.landing.heat * 0.4);
-    if (this.landing.phase === "landed") {
-      this.hud.setCloud(0);
-      this.hud.setShake(0);
-    }
-  }
-
-  private updatePlanet(dt: number): void {
-    this.ensureCameraChild(false);
-    this.interior.update(dt, this.player.pos.x, this.player.pos.z, this.player.radius);
-    const look = this.input.consumeLook();
-    const res = this.player.update(dt, look.yaw, look.pitch, 1);
-    if (res.step) audio.footstep("grass");
-    const eye = this.player.eyePos;
-    this.renderer.camera.position.copy(eye);
-    this.renderer.camera.rotation.set(0, 0, 0);
-    this.renderer.camera.rotateY(this.player.yaw);
-    this.renderer.camera.rotateX(this.player.pitch);
-
-    // ambient jungle calls occasionally
-    if (Math.random() < dt * 0.1) audio.jungleCall();
-    if (Math.random() < dt * 0.3) audio.spore();
-
-    // interact (signal source)
-    const it = this.interact.find(this.renderer.camera);
-    this.hud.setInteraction(it ? it.label : "");
-    if (it && (this.input.justPressed("e") || this.input.mouseJustPressed("left"))) {
-      it.onInteract();
-      audio.click();
-    }
+  get scenes(): { ship: Scene; planet: Scene } {
+    return { ship: this.shipScene, planet: this.planetScene };
   }
 }
 
-
+void Fog;
+void Group;
+void Object3D;
+void clamp;
+void lerp;
+void TERRAIN_SIZE;

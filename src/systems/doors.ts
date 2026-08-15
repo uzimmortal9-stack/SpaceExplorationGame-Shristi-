@@ -1,134 +1,173 @@
-import * as THREE from "three";
-import { CollisionWorld } from "./collision";
-import { audio } from "../core/audio";
-import { damp } from "../core/math";
-
-export type DoorState = "closed" | "opening" | "open" | "closing";
-
 /**
- * Sliding door: two panels slide apart horizontally. The doorway volume is a
- * collision box that is only solid while the door is closed. Obstruction safety
- * prevents the door closing while the player is in the threshold.
+ * Doors — automatic bi-parting sliding doors with hydraulics and safety.
+ *
+ * Behaviour:
+ *   * Opens automatically when the player enters the trigger radius.
+ *   * Stays open while anything occupies the doorway (obstruction safety) and
+ *     re-opens instantly if the player steps back in while closing.
+ *   * The collider is disabled only once the leaves are far enough apart, so
+ *     the player can never be pushed through geometry.
+ *   * Airlocks use `interlock` so an outer door refuses to open while the inner
+ *     one is not fully sealed.
  */
+
+import { Box3, Object3D, Vector3 } from 'three';
+
+import type { AudioEngine } from '../core/audio';
+import { clamp, easeInOutCubic } from '../core/math';
+import type { Collider, CollisionWorld } from './collision';
+
+export type DoorState = 'closed' | 'opening' | 'open' | 'closing' | 'locked';
+
+export interface DoorConfig {
+  id: string;
+  /** Left and right (or single) leaf nodes. */
+  leaves: Object3D[];
+  /** Local axis each leaf slides along, in metres at full open. */
+  travel: Vector3[];
+  /** World-space centre of the doorway. */
+  center: Vector3;
+  collider?: Collider;
+  triggerRadius?: number;
+  /** Doorway volume used for the obstruction check. */
+  clearance: Box3;
+  autoOpen?: boolean;
+  openTime?: number;
+  holdTime?: number;
+  locked?: boolean;
+  /** This door refuses to open while the referenced door is not closed. */
+  interlock?: string;
+  onStateChange?: (state: DoorState) => void;
+}
+
 export class Door {
-  state: DoorState = "closed";
-  private progress = 0; // 0 closed .. 1 open
-  private target = 0;
-  private autoCloseTimer = 0;
-  readonly group = new THREE.Group();
-  private panels: { mesh: THREE.Object3D; dir: THREE.Vector3 }[] = [];
-  private block: { box: ReturnType<CollisionWorld["addBox"]>; axis: "x" | "z"; savedMax: number } | null = null;
-  soundPlaying = false;
+  state: DoorState;
+  private t = 0;
+  private holdTimer = 0;
+  private readonly rest: Vector3[];
+  private lastAudible: DoorState | null = null;
 
-  constructor(
-    private collision: CollisionWorld,
-    opts: {
-      width: number;
-      height: number;
-      thickness: number;
-      frameColor?: THREE.Color;
-      onFinished?: (open: boolean) => void;
-    },
-  ) {
-    const w = opts.width;
-    const h = opts.height;
-    const t = opts.thickness;
-    // frame
-    const frameMat = new THREE.MeshStandardMaterial({ color: opts.frameColor ?? 0x6b7683, metalness: 0.6, roughness: 0.4 });
-    const jambW = 0.12;
-    const top = new THREE.Mesh(new THREE.BoxGeometry(w + jambW * 2, jambW, t), frameMat);
-    top.position.y = h - jambW / 2;
-    const left = new THREE.Mesh(new THREE.BoxGeometry(jambW, h, t), frameMat);
-    left.position.x = -w / 2 - jambW / 2;
-    left.position.y = h / 2;
-    const right = left.clone();
-    right.position.x = w / 2 + jambW / 2;
-    this.group.add(top, left, right);
-
-    // sliding panels
-    const panelMat = new THREE.MeshStandardMaterial({ color: 0xaeb8c2, metalness: 0.8, roughness: 0.35 });
-    const panelGeo = new THREE.BoxGeometry(w / 2 - 0.03, h - 0.06, t * 0.9);
-    for (const side of [-1, 1]) {
-      const p = new THREE.Mesh(panelGeo, panelMat);
-      p.position.set(side * (w / 4), h / 2, 0);
-      p.userData.baseX = p.position.x;
-      this.group.add(p);
-      this.panels.push({ mesh: p, dir: new THREE.Vector3(side * (w / 2), 0, 0) });
-    }
-    // Blocking box (register after group has its transform set by caller)
-    this.group.userData.isDoor = true;
+  constructor(readonly cfg: DoorConfig, private readonly audio: AudioEngine) {
+    this.state = cfg.locked ? 'locked' : 'closed';
+    this.rest = cfg.leaves.map((l) => l.position.clone());
   }
 
-  /** Register the closed-door collision box. Call after positioning the group. */
-  setBlock(axis: "x" | "z", minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number): void {
-    const box = this.collision.addBox(minX, minY, minZ, maxX, maxY, maxZ);
-    this.block = { box, axis, savedMax: axis === "x" ? maxX : maxZ };
+  get id(): string {
+    return this.cfg.id;
   }
 
-  open(): void {
-    if (this.state === "open" || this.target === 1) return;
-    this.target = 1;
-    this.state = "opening";
-    if (!this.soundPlaying) {
-      this.soundPlaying = true;
-      audio.doorSlide(true);
-    }
-    if (this.block) {
-      const b = this.block.box;
-      if (this.block.axis === "x") b.max.x = b.min.x;
-      else b.max.z = b.min.z;
-    }
-    this.autoCloseTimer = 2.6;
+  get openAmount(): number {
+    return this.t;
   }
 
-  close(): void {
-    if (this.state === "closed") return;
-    this.target = 0;
-    this.state = "closing";
-    if (!this.soundPlaying) {
-      this.soundPlaying = true;
-      audio.doorSlide(false);
+  get isPassable(): boolean {
+    return this.t > 0.55;
+  }
+
+  lock(locked: boolean): void {
+    if (locked) {
+      this.state = 'locked';
+    } else if (this.state === 'locked') {
+      this.state = this.t > 0.99 ? 'open' : 'closed';
     }
   }
 
-  /** Call each frame. Returns true while transitioning. */
-  update(dt: number, playerX: number, playerZ: number, playerR: number): boolean {
-    this.progress = damp(this.progress, this.target, 6, dt);
-    // panels slide apart based on progress
-    for (const p of this.panels) {
-      p.mesh.position.x = p.mesh.userData.baseX + p.dir.x * this.progress;
-    }
+  requestOpen(): void {
+    if (this.state === 'locked') return;
+    if (this.state === 'closed' || this.state === 'closing') this.state = 'opening';
+    this.holdTimer = this.cfg.holdTime ?? 1.6;
+  }
 
-    if (this.target === 1 && this.progress > 0.97) {
-      if (this.state === "opening") this.soundPlaying = false;
-      this.state = "open";
-      // auto close after timer unless obstructed
-      this.autoCloseTimer -= dt;
-      if (this.autoCloseTimer <= 0) {
-        const threshold = this.block;
-        if (threshold) {
-          const obstructed = this.collision.obstructed(playerX, 0, playerZ, playerR, 1.8);
-          if (!obstructed) this.close();
-          else {
-            audio.doorBump();
-            this.autoCloseTimer = 1.2;
-          }
-        } else {
-          this.close();
+  requestClose(): void {
+    if (this.state === 'open' || this.state === 'opening') this.state = 'closing';
+  }
+
+  update(
+    dt: number,
+    playerPos: Vector3,
+    playerRadius: number,
+    playerHeight: number,
+    doors: Map<string, Door>,
+  ): void {
+    const cfg = this.cfg;
+    const dist = playerPos.distanceTo(cfg.center);
+    const trigger = cfg.triggerRadius ?? 3.4;
+    const blocked = cfg.clearance.intersectsBox(
+      new Box3(
+        new Vector3(playerPos.x - playerRadius, playerPos.y, playerPos.z - playerRadius),
+        new Vector3(playerPos.x + playerRadius, playerPos.y + playerHeight, playerPos.z + playerRadius),
+      ),
+    );
+
+    if (this.state !== 'locked') {
+      const interlockOk = !cfg.interlock || (doors.get(cfg.interlock)?.t ?? 0) < 0.02;
+      const wantOpen = (cfg.autoOpen ?? true) && dist < trigger && interlockOk;
+
+      if (wantOpen || blocked) {
+        if (interlockOk || blocked) {
+          if (this.state === 'closed' || this.state === 'closing') this.state = 'opening';
+          this.holdTimer = cfg.holdTime ?? 1.6;
         }
+      } else if (this.state === 'open') {
+        this.holdTimer -= dt;
+        if (this.holdTimer <= 0) this.state = 'closing';
       }
-    } else if (this.target === 0 && this.progress < 0.03) {
-      if (this.state === "closing") this.soundPlaying = false;
-      this.state = "closed";
-      if (this.block) {
-        if (this.block.axis === "x") this.block.box.max.x = this.block.savedMax;
-        else this.block.box.max.z = this.block.savedMax;
-      }
+
+      // Safety: never close on the player.
+      if (this.state === 'closing' && blocked) this.state = 'opening';
     }
-    return this.state === "opening" || this.state === "closing";
+
+    const speed = 1 / (cfg.openTime ?? 1.0);
+    if (this.state === 'opening') {
+      this.t = clamp(this.t + dt * speed, 0, 1);
+      if (this.t >= 1) this.state = 'open';
+    } else if (this.state === 'closing') {
+      this.t = clamp(this.t - dt * speed, 0, 1);
+      if (this.t <= 0) this.state = 'closed';
+    } else if (this.state === 'locked') {
+      this.t = clamp(this.t - dt * speed, 0, 1);
+    }
+
+    // audio triggers on state edges only
+    if (this.state !== this.lastAudible) {
+      if (this.state === 'opening') this.audio.doorSlide(true);
+      else if (this.state === 'closing') this.audio.doorSlide(false);
+      this.lastAudible = this.state;
+      cfg.onStateChange?.(this.state);
+    }
+
+    const e = easeInOutCubic(this.t);
+    for (let i = 0; i < cfg.leaves.length; i++) {
+      const leaf = cfg.leaves[i];
+      const travel = cfg.travel[i] ?? cfg.travel[0];
+      leaf.position.copy(this.rest[i]).addScaledVector(travel, e);
+    }
+
+    if (cfg.collider) cfg.collider.enabled = this.t < 0.55;
+  }
+}
+
+export class DoorSystem {
+  readonly doors = new Map<string, Door>();
+
+  constructor(private readonly audio: AudioEngine, private readonly collision: CollisionWorld) {}
+
+  add(cfg: DoorConfig): Door {
+    const door = new Door(cfg, this.audio);
+    this.doors.set(cfg.id, door);
+    return door;
   }
 
-  isOpen(): boolean {
-    return this.progress > 0.6;
+  get(id: string): Door | undefined {
+    return this.doors.get(id);
+  }
+
+  clear(): void {
+    this.doors.clear();
+  }
+
+  update(dt: number, playerPos: Vector3, radius: number, height: number): void {
+    for (const d of this.doors.values()) d.update(dt, playerPos, radius, height, this.doors);
+    void this.collision;
   }
 }

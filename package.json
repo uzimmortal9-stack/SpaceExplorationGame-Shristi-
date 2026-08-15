@@ -1,21 +1,23 @@
 {
-  "name": "aurora-voyager-space-exploration",
+  "name": "aurora-drift",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Aurora Voyager — a first-person 3D sci-fi space exploration game built with three.js. Explore a starship interior, fly 6-DOF, jump to warp, and land on an alien jungle world.",
+  "description": "Aurora Drift - a first-person 3D sci-fi space exploration game: explore a starship, fly 6-DOF, warp, enter atmosphere, land, and explore an alien jungle world.",
   "scripts": {
+    "assets": "node tools/fetch-assets.mjs",
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "smoke": "node tools/capture-build.mjs && node tools/smoke.mjs"
   },
   "dependencies": {
-    "three": "^0.179.1"
+    "three": "^0.180.0"
   },
   "devDependencies": {
-    "@types/three": "^0.179.0",
+    "@types/three": "^0.180.0",
     "typescript": "^5.9.2",
-    "vite": "^7.1.2"
+    "vite": "^7.1.3"
   }
 }

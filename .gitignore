@@ -1,5 +1,7 @@
 node_modules/
 dist/
+.assetcache/
 *.log
 .DS_Store
 .vite/
+.capture/
