@@ -1,0 +1,1072 @@
+{
+  "$comment": "Source-of-truth asset manifest. `npm run assets` downloads every entry, converts USD -> glb, and writes public/assets/manifest.json. All model sources are CC0-1.0.",
+  "sources": {
+    "quaternius": {
+      "repo": "weftspun/quaternius-stage",
+      "ref": "main",
+      "root": "models",
+      "license": "CC0-1.0",
+      "author": "Quaternius",
+      "homepage": "https://quaternius.com",
+      "mirror": "https://github.com/weftspun/quaternius-stage"
+    },
+    "threejs": {
+      "repo": "mrdoob/three.js",
+      "ref": "dev",
+      "root": "examples",
+      "license": "MIT (assets CC0 / public domain)",
+      "author": "three.js contributors, Poly Haven, ambientCG",
+      "homepage": "https://threejs.org"
+    }
+  },
+  "textures": [
+    {
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/textures/T_Trim01_D.png"
+    },
+    {
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/textures/T_Trim01_N.png"
+    },
+    {
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/textures/T_Trim01Red_D.png"
+    },
+    {
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/textures/T_Trim02_D.png"
+    },
+    {
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/textures/T_Trim02Red_D.png"
+    },
+    {
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/textures/T_Trim03_D.png"
+    },
+    {
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/textures/T_Trim03Cables_D.png"
+    },
+    {
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/textures/T_PaddedWall_D.png"
+    },
+    {
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/textures/T_Decals_D.png"
+    },
+    {
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/textures/T_Trim02_N.png"
+    },
+    {
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/textures/T_Trim03_N.png"
+    },
+    {
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/textures/T_Trim03Dark_D.png"
+    },
+    {
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/textures/T_PropsBatch1_D.png"
+    },
+    {
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/textures/T_PropsBatch1_N.png"
+    },
+    {
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/textures/T_PropsBatch2_D.png"
+    },
+    {
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/textures/T_PropsBatch2_N.png"
+    },
+    {
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/textures/T_PropsCrates_D.png"
+    },
+    {
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/textures/T_GunsBatch1_D.png"
+    },
+    {
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/textures/T_GunsBatch2_D.png"
+    }
+  ],
+  "environment": [
+    {
+      "src": "threejs",
+      "path": "textures/equirectangular/moonless_golf_1k.hdr",
+      "out": "hdri/space_night_1k.hdr",
+      "credit": "Poly Haven \u2014 'Moonless Golf' HDRI (CC0)",
+      "use": "Deep-space / night environment lighting"
+    },
+    {
+      "src": "threejs",
+      "path": "textures/equirectangular/quarry_01_1k.hdr",
+      "out": "hdri/interior_1k.hdr",
+      "credit": "Poly Haven \u2014 'Quarry 01' HDRI (CC0)",
+      "use": "Ship interior environment reflections"
+    },
+    {
+      "src": "threejs",
+      "path": "textures/equirectangular/blouberg_sunrise_2_1k.hdr",
+      "out": "hdri/planet_sky_1k.hdr",
+      "credit": "Poly Haven \u2014 'Blouberg Sunrise 2' HDRI (CC0)",
+      "use": "Alien jungle daylight environment"
+    },
+    {
+      "src": "threejs",
+      "path": "textures/equirectangular/venice_sunset_1k.hdr",
+      "out": "hdri/orbit_1k.hdr",
+      "credit": "Poly Haven \u2014 'Venice Sunset' HDRI (CC0)",
+      "use": "Planetary orbit / warp exit environment"
+    }
+  ],
+  "surfaces": [
+    {
+      "src": "threejs",
+      "files": {
+        "map": "textures/ambientcg/Ice002_1K-JPG_Color.jpg",
+        "normalMap": "textures/ambientcg/Ice002_1K-JPG_NormalGL.jpg",
+        "roughnessMap": "textures/ambientcg/Ice002_1K-JPG_Roughness.jpg",
+        "displacementMap": "textures/ambientcg/Ice002_1K-JPG_Displacement.jpg"
+      },
+      "out": "surfaces/rock",
+      "credit": "ambientCG \u2014 Ice002 PBR set (CC0)",
+      "use": "Planet rock / cliff material"
+    },
+    {
+      "src": "threejs",
+      "files": {
+        "map": "textures/brick_diffuse.jpg",
+        "normalMap": "textures/brick_bump.jpg",
+        "roughnessMap": "textures/brick_roughness.jpg"
+      },
+      "out": "surfaces/stone",
+      "credit": "three.js examples \u2014 brick PBR set (public domain)",
+      "use": "Alien ruin stonework"
+    },
+    {
+      "src": "threejs",
+      "files": {
+        "map": "textures/hardwood2_diffuse.jpg",
+        "normalMap": "textures/hardwood2_bump.jpg",
+        "roughnessMap": "textures/hardwood2_roughness.jpg"
+      },
+      "out": "surfaces/wood",
+      "credit": "three.js examples \u2014 hardwood PBR set (public domain)",
+      "use": "Crew quarters warm surfaces"
+    },
+    {
+      "src": "threejs",
+      "files": {
+        "map": "textures/carbon/Carbon.png",
+        "normalMap": "textures/carbon/Carbon_Normal.png"
+      },
+      "out": "surfaces/carbon",
+      "credit": "three.js examples \u2014 carbon fibre set (public domain)",
+      "use": "Hull composite panels"
+    },
+    {
+      "src": "threejs",
+      "files": {
+        "map": "textures/planets/earth_atmos_2048.jpg"
+      },
+      "out": "surfaces/planet_temperate",
+      "credit": "NASA Visible Earth / three.js examples (public domain)",
+      "use": "Solar-system planet albedo"
+    },
+    {
+      "src": "threejs",
+      "files": {
+        "map": "textures/planets/moon_1024.jpg"
+      },
+      "out": "surfaces/planet_moon",
+      "credit": "NASA / three.js examples (public domain)",
+      "use": "Moon albedo"
+    },
+    {
+      "src": "threejs",
+      "files": {
+        "map": "textures/terrain/grasslight-big.jpg"
+      },
+      "out": "surfaces/ground",
+      "credit": "three.js examples \u2014 terrain ground (public domain)",
+      "use": "Jungle ground detail"
+    },
+    {
+      "src": "threejs",
+      "files": {
+        "map": "textures/water.jpg"
+      },
+      "out": "surfaces/water",
+      "credit": "three.js examples \u2014 water normal (public domain)",
+      "use": "Waterfall / glowing pool animation"
+    }
+  ],
+  "models": [
+    {
+      "id": "wall",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_WallAstraStraight.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "wall_window",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_WallAstraStraightWindow.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "wall_flat",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_WallAstraStraightFlat.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "wall_divided",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_WallAstraStraightDivided.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "wall_band",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_WallBandStraight.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "wall_corner_in",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_WallAstraCornerSquareInner.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "wall_corner_out",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_WallAstraCornerSquareOuter.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "wall_viewport",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_WallWindowStraight.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "floor",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_PlatformSimple.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "floor_plates",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_PlatformMetal.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "floor_squares",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_PlatformSquares.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "floor_dark",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_PlatformDarkPlates.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "ceiling",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_TopSimpleStraight.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "ceiling_cables",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_TopCablesStraight.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "ceiling_plastic",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_TopPlasticStraight.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "stairs",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_PlatformStairs_4.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "ramp",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_PlatformRamp_4.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "railing",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_PropRail_4.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "door_frame",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_DoorFrameSquare.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "door_panel",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_DoorSimple.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "door_dark",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_DoorDarkMetal.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "column",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_ColumnSimple.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "column_pipes",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_ColumnPipes.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "column_support",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_ColumnMetalSupport.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "light_wide",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_PropLightWide.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "light_small",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_PropLightSmall.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "light_floor",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_PropLightFloor.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "vent_big",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_PropVentBig.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "vent_wide",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_PropVentWide.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "cable_a",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_PropCable_1.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "cable_b",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_PropCable_3.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "access_point",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_PropAccessPoint.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "console",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_PropComputer.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "barrel_large",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_PropBarrelLarge.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "clamp",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_PropClamp.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "item_holder",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/S_PropItemHolder.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "fan",
+      "src": "quaternius",
+      "path": "ModularSciFiMegaKit/SK_PropFanSmall.usda",
+      "pivot": "center"
+    },
+    {
+      "id": "seat",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropChair.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "desk_large",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropDesk_L.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "desk_medium",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropDeskMedium.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "desk_small",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropDeskSmall.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "locker",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropLocker.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "shelves_tall",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropShelvesWideTall.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "shelves_short",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropShelvesWideShort.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "shelves_thin",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropShelvesThinTall.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "crate",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropCrate.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "crate_large",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropCrateLarge.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "crate_tarp",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropCrateTarp.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "barrel",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropBarrel1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "barrel_open",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropBarrel2Open.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "satellite_dish",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropSatelliteDish.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "mug",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropMug.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "keycard",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropKeyCard.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "healthpack",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropHealthPack.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "health_tube",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropHealthPackTube.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "syringe",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropSyringe.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "ammo_box",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_PropAmmo.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "rifle",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_GunRifle.usda",
+      "pivot": "center"
+    },
+    {
+      "id": "pistol",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_GunPistol.usda",
+      "pivot": "center"
+    },
+    {
+      "id": "sniper",
+      "src": "quaternius",
+      "path": "SciFiEssentialsKit/S_GunSniper.usda",
+      "pivot": "center"
+    },
+    {
+      "id": "pod",
+      "src": "quaternius",
+      "path": "UltimateModularSciFi/S_PropsPod.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "capsule",
+      "src": "quaternius",
+      "path": "UltimateModularSciFi/S_PropsCapsule.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "vessel_tall",
+      "src": "quaternius",
+      "path": "UltimateModularSciFi/S_PropsVesselTall.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "vessel",
+      "src": "quaternius",
+      "path": "UltimateModularSciFi/S_PropsVessel.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "teleporter",
+      "src": "quaternius",
+      "path": "UltimateModularSciFi/S_PropsTeleporter_1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "container_full",
+      "src": "quaternius",
+      "path": "UltimateModularSciFi/S_PropsContainerFull.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "console_small",
+      "src": "quaternius",
+      "path": "UltimateModularSciFi/S_PropsComputerSmall.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "pipes",
+      "src": "quaternius",
+      "path": "UltimateModularSciFi/S_Pipes.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "bed",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_BedSingle.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "nightstand",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_NightStand_1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "toilet",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_BathroomToilet.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "sink",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_BathroomSink.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "shower",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_BathroomShower1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "bathtub",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_BathroomBathtub.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "mirror",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_BathroomMirror1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "towel",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_BathroomTowel.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "couch",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_CouchMedium1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "couch_small",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_CouchSmall1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "table_round",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_TableRoundSmall.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "chair_soft",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_Chair_1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "stool",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_Stool.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "bookshelf",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_Bookshelf.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "plant_a",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_Houseplant_1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "plant_b",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_Houseplant_4.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "plant_c",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_Houseplant_6.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "fridge",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_KitchenFridge.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "kitchen_counter",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_Kitchen2Drawers.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "kitchen_cabinet",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_KitchenCabinet1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "kitchen_sink",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_KitchenSink.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "oven",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_KitchenOven.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "plate",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_Plate_1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "desk_lamp",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_LightDesk.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "trashcan",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_TrashcanSmall1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "carpet",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_Carpet_1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "drawer",
+      "src": "quaternius",
+      "path": "UltimateHomeInterior/S_Drawer_1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "office_chair",
+      "src": "quaternius",
+      "path": "UltimateFurniture/S_OfficeChair.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "desk_plain",
+      "src": "quaternius",
+      "path": "UltimateFurniture/S_Desk.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "closet",
+      "src": "quaternius",
+      "path": "UltimateFurniture/S_Closet.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "table_long",
+      "src": "quaternius",
+      "path": "UltimateFurniture/S_Table.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "hull_zenith",
+      "src": "quaternius",
+      "path": "UltimateSpaceShips/S_Zenith.usda",
+      "pivot": "center"
+    },
+    {
+      "id": "hull_imperial",
+      "src": "quaternius",
+      "path": "UltimateSpaceShips/S_Imperial.usda",
+      "pivot": "center"
+    },
+    {
+      "id": "hull_challenger",
+      "src": "quaternius",
+      "path": "UltimateSpaceShips/S_Challenger.usda",
+      "pivot": "center"
+    },
+    {
+      "id": "rock_1",
+      "src": "quaternius",
+      "path": "UltimateSpaceKit/S_RockLarge_1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "rock_2",
+      "src": "quaternius",
+      "path": "UltimateSpaceKit/S_RockLarge_2.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "rock_3",
+      "src": "quaternius",
+      "path": "UltimateSpaceKit/S_Rock_1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "rock_4",
+      "src": "quaternius",
+      "path": "UltimateSpaceKit/S_Rock_3.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "alien_tree_1",
+      "src": "quaternius",
+      "path": "UltimateSpaceKit/S_TreeSpiral_1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "alien_tree_2",
+      "src": "quaternius",
+      "path": "UltimateSpaceKit/S_TreeSpiral_3.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "alien_tree_3",
+      "src": "quaternius",
+      "path": "UltimateSpaceKit/S_TreeSwirl_1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "alien_tree_4",
+      "src": "quaternius",
+      "path": "UltimateSpaceKit/S_TreeBlob_2.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "alien_tree_5",
+      "src": "quaternius",
+      "path": "UltimateSpaceKit/S_TreeLight_1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "alien_tree_6",
+      "src": "quaternius",
+      "path": "UltimateSpaceKit/S_TreeSpikes_1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "alien_bush_1",
+      "src": "quaternius",
+      "path": "UltimateSpaceKit/S_Bush_1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "alien_bush_2",
+      "src": "quaternius",
+      "path": "UltimateSpaceKit/S_Bush_3.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "alien_grass_1",
+      "src": "quaternius",
+      "path": "UltimateSpaceKit/S_Grass_1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "alien_grass_2",
+      "src": "quaternius",
+      "path": "UltimateSpaceKit/S_Grass_3.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "alien_plant_1",
+      "src": "quaternius",
+      "path": "UltimateSpaceKit/S_Plant_1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "alien_plant_2",
+      "src": "quaternius",
+      "path": "UltimateSpaceKit/S_Plant_3.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "palm_1",
+      "src": "quaternius",
+      "path": "UltimateStylizedNature/S_PalmTree_1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "palm_2",
+      "src": "quaternius",
+      "path": "UltimateStylizedNature/S_PalmTree_3.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "jungle_tree_1",
+      "src": "quaternius",
+      "path": "UltimateStylizedNature/S_NormalTree_2.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "jungle_tree_2",
+      "src": "quaternius",
+      "path": "UltimateStylizedNature/S_NormalTree_4.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "fern",
+      "src": "quaternius",
+      "path": "StylizedNatureMegaKit/S_Fern_1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "mushroom_1",
+      "src": "quaternius",
+      "path": "StylizedNatureMegaKit/S_MushroomCommon.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "mushroom_2",
+      "src": "quaternius",
+      "path": "StylizedNatureMegaKit/S_MushroomLaetiporus.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "flower_1",
+      "src": "quaternius",
+      "path": "UltimateStylizedNature/S_Flower1Clump.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "flower_2",
+      "src": "quaternius",
+      "path": "UltimateStylizedNature/S_Flower3Clump.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "pebble_1",
+      "src": "quaternius",
+      "path": "StylizedNatureMegaKit/S_PebbleRound_1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "pebble_2",
+      "src": "quaternius",
+      "path": "StylizedNatureMegaKit/S_PebbleSquare_3.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "ruin_arch",
+      "src": "quaternius",
+      "path": "UltimateModularRuins/S_ArchRound.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "ruin_arch_gothic",
+      "src": "quaternius",
+      "path": "UltimateModularRuins/S_ArchGothic.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "ruin_column",
+      "src": "quaternius",
+      "path": "UltimateModularRuins/S_ColumnRound.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "ruin_column_short",
+      "src": "quaternius",
+      "path": "UltimateModularRuins/S_ColumnRoundShort.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "ruin_column_sq",
+      "src": "quaternius",
+      "path": "UltimateModularRuins/S_ColumnSquare.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "ruin_wall",
+      "src": "quaternius",
+      "path": "UltimateModularRuins/S_WallOvergrown.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "ruin_wall_broken",
+      "src": "quaternius",
+      "path": "UltimateModularRuins/S_WallBroken.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "ruin_wall_arch",
+      "src": "quaternius",
+      "path": "UltimateModularRuins/S_WallArchRoundOvergrown.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "ruin_floor",
+      "src": "quaternius",
+      "path": "UltimateModularRuins/S_FloorStandard.usda",
+      "pivot": "keep"
+    },
+    {
+      "id": "ruin_stairs",
+      "src": "quaternius",
+      "path": "UltimateModularRuins/S_Stairs.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "ruin_statue",
+      "src": "quaternius",
+      "path": "UltimateModularRuins/S_StatueStag.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "ruin_brazier",
+      "src": "quaternius",
+      "path": "UltimateModularRuins/S_Torch.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "ruin_pot",
+      "src": "quaternius",
+      "path": "UltimateModularRuins/S_Pot1.usda",
+      "pivot": "bottom"
+    },
+    {
+      "id": "ruin_support",
+      "src": "quaternius",
+      "path": "UltimateModularRuins/S_SupportTall.usda",
+      "pivot": "bottom"
+    }
+  ]
+}

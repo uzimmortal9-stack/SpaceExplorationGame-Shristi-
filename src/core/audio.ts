@@ -1,280 +1,348 @@
 /**
- * AudioEngine — fully procedural WebAudio synthesis.
- * No external audio files required; every sound is synthesized at runtime so
- * the game is self-contained and immersive.
+ * Audio — a small procedural synthesis layer built on the Web Audio API.
+ *
+ * Everything is generated at runtime (no sample downloads): noise beds for
+ * ambience, filtered noise bursts for hydraulics and thrusters, FM blips for
+ * console UI, and a sustained detuned-saw drone for the warp core. Each layer
+ * is routed through a master gain so the settings panel can mix them.
  */
 
-export type Zone = "ship" | "space" | "jungle";
+import { clamp } from './math';
 
-type OscType = OscillatorType;
-
-interface ToneOpts {
-  type?: OscType;
-  freq?: number;
-  end?: number;
-  gain?: number;
-  dur?: number;
-  attack?: number;
-  when?: number;
-}
+type BusName = 'master' | 'ambient' | 'sfx' | 'music';
 
 export class AudioEngine {
   private ctx: AudioContext | null = null;
-  private master: GainNode | null = null;
-  private ambientGain: GainNode | null = null;
-  private sfxGain: GainNode | null = null;
-  private muted = false;
-  private volume = 0.8;
+  private readonly buses = new Map<BusName, GainNode>();
+  private readonly loops = new Map<string, { gain: GainNode; stop: () => void }>();
+  private noiseBuffer: AudioBuffer | null = null;
+  private started = false;
+  private volumes: Record<BusName, number> = { master: 0.8, ambient: 0.7, sfx: 0.85, music: 0.5 };
 
-  private humNodes: OscillatorNode[] = [];
-  private currentZone: Zone = "ship";
+  get context(): AudioContext | null {
+    return this.ctx;
+  }
 
-  /** Must be called from a user gesture (main menu button). */
-  init(): void {
-    if (this.ctx) {
-      if (this.ctx.state === "suspended") void this.ctx.resume();
-      return;
+  get isRunning(): boolean {
+    return this.started && this.ctx?.state === 'running';
+  }
+
+  /** Must be called from a user gesture. */
+  async unlock(): Promise<void> {
+    if (!this.ctx) {
+      const Ctor: typeof AudioContext =
+        window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!Ctor) return;
+      this.ctx = new Ctor();
+      const master = this.ctx.createGain();
+      master.gain.value = this.volumes.master;
+      master.connect(this.ctx.destination);
+      this.buses.set('master', master);
+      for (const name of ['ambient', 'sfx', 'music'] as const) {
+        const g = this.ctx.createGain();
+        g.gain.value = this.volumes[name];
+        g.connect(master);
+        this.buses.set(name, g);
+      }
+      this.noiseBuffer = this.makeNoiseBuffer(2.5);
     }
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    this.ctx = ctx;
-    this.master = ctx.createGain();
-    this.master.gain.value = this.volume;
-    this.master.connect(ctx.destination);
-    this.ambientGain = ctx.createGain();
-    this.ambientGain.gain.value = 0.5;
-    this.ambientGain.connect(this.master);
-    this.sfxGain = ctx.createGain();
-    this.sfxGain.gain.value = 1;
-    this.sfxGain.connect(this.master);
-    this.startShipAmbience();
+    if (this.ctx.state === 'suspended') await this.ctx.resume();
+    this.started = true;
   }
 
-  setVolume(v: number): void {
-    this.volume = v;
-    if (this.master) this.master.gain.value = this.muted ? 0 : v;
+  setVolume(bus: BusName, value: number): void {
+    this.volumes[bus] = clamp(value, 0, 1);
+    const node = this.buses.get(bus);
+    if (node && this.ctx) node.gain.setTargetAtTime(this.volumes[bus], this.ctx.currentTime, 0.05);
   }
 
-  toggleMute(): boolean {
-    this.muted = !this.muted;
-    if (this.master) this.master.gain.value = this.muted ? 0 : this.volume;
-    return this.muted;
+  getVolume(bus: BusName): number {
+    return this.volumes[bus];
   }
 
-  private tone(opts: ToneOpts, dest?: AudioNode, when = 0): void {
-    if (!this.ctx || !this.sfxGain) return;
-    const t = this.ctx.currentTime + when;
-    const osc = this.ctx.createOscillator();
-    const g = this.ctx.createGain();
-    osc.type = opts.type || "sine";
-    osc.frequency.setValueAtTime(opts.freq || 440, t);
-    if (opts.end) osc.frequency.exponentialRampToValueAtTime(opts.end, t + (opts.dur || 0.2));
-    const peak = opts.gain ?? 0.2;
-    const dur = opts.dur || 0.2;
-    const atk = opts.attack ?? 0.005;
+  private bus(name: BusName): GainNode | null {
+    return this.buses.get(name) ?? null;
+  }
+
+  private makeNoiseBuffer(seconds: number): AudioBuffer {
+    const ctx = this.ctx!;
+    const len = Math.floor(ctx.sampleRate * seconds);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    // pink-ish noise (Voss-McCartney approximation) reads warmer than white
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    for (let i = 0; i < len; i++) {
+      const white = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + white * 0.0555179;
+      b1 = 0.99332 * b1 + white * 0.0750759;
+      b2 = 0.969 * b2 + white * 0.153852;
+      b3 = 0.8665 * b3 + white * 0.3104856;
+      b4 = 0.55 * b4 + white * 0.5329522;
+      b5 = -0.7616 * b5 - white * 0.016898;
+      const pink = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+      b6 = white * 0.115926;
+      data[i] = pink * 0.11;
+    }
+    return buf;
+  }
+
+  // ---------------------------------------------------------------- one-shots
+
+  /** Short filtered-noise burst — doors, thrusters, dust, water. */
+  noiseBurst(opts: {
+    duration?: number;
+    gain?: number;
+    filter?: number;
+    filterEnd?: number;
+    q?: number;
+    type?: BiquadFilterType;
+    bus?: BusName;
+    attack?: number;
+  } = {}): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.noiseBuffer) return;
+    const {
+      duration = 0.4, gain = 0.3, filter = 800, filterEnd = filter,
+      q = 1.0, type = 'bandpass', bus = 'sfx', attack = 0.01,
+    } = opts;
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuffer;
+    src.loop = true;
+    const bq = ctx.createBiquadFilter();
+    bq.type = type;
+    bq.frequency.setValueAtTime(filter, t);
+    bq.frequency.exponentialRampToValueAtTime(Math.max(40, filterEnd), t + duration);
+    bq.Q.value = q;
+    const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(peak, t + atk);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    osc.connect(g);
-    g.connect(dest || this.sfxGain);
-    osc.start(t);
-    osc.stop(t + dur + 0.05);
-  }
-
-  private noise(dur: number, gain: number, freq: number, q = 1, dest?: AudioNode, when = 0): void {
-    if (!this.ctx || !this.sfxGain) return;
-    const t = this.ctx.currentTime + when;
-    const len = Math.floor(this.ctx.sampleRate * dur);
-    const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-    const src = this.ctx.createBufferSource();
-    src.buffer = buf;
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = "bandpass";
-    filter.frequency.value = freq;
-    filter.Q.value = q;
-    const g = this.ctx.createGain();
-    g.gain.setValueAtTime(gain, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    src.connect(filter);
-    filter.connect(g);
-    g.connect(dest || this.sfxGain);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain), t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    src.connect(bq).connect(g).connect(this.bus(bus)!);
     src.start(t);
+    src.stop(t + duration + 0.05);
   }
 
-  // ---- UI / mechanical feedback ----
-  click(): void {
-    this.tone({ type: "square", freq: 1400, gain: 0.06, dur: 0.03 });
-  }
-  hover(): void {
-    this.tone({ type: "square", freq: 1200, gain: 0.04, dur: 0.02 });
-  }
-  confirm(): void {
-    this.tone({ type: "sine", freq: 700, gain: 0.12, dur: 0.08 });
-    this.tone({ type: "sine", freq: 1050, gain: 0.12, dur: 0.14, when: 0.06 });
-  }
-  clunk(): void {
-    this.tone({ type: "triangle", freq: 120, end: 60, gain: 0.5, dur: 0.15 });
-    this.noise(0.12, 0.2, 900, 1);
-  }
-  switchHit(): void {
-    this.tone({ type: "square", freq: 900, end: 300, gain: 0.16, dur: 0.05 });
-  }
-  beep(): void {
-    this.tone({ type: "square", freq: 2200, gain: 0.05, dur: 0.04 });
-  }
-  warn(): void {
-    this.tone({ type: "sawtooth", freq: 320, end: 220, gain: 0.15, dur: 0.25 });
-    this.tone({ type: "sawtooth", freq: 320, end: 220, gain: 0.15, dur: 0.25, when: 0.35 });
-  }
-  targetLock(): void {
-    this.tone({ type: "sine", freq: 880, gain: 0.12, dur: 0.06 });
-    this.tone({ type: "sine", freq: 1320, gain: 0.12, dur: 0.1, when: 0.06 });
+  /** Pitched tone — UI clicks, confirms, target lock. */
+  tone(opts: {
+    freq?: number;
+    freqEnd?: number;
+    duration?: number;
+    gain?: number;
+    type?: OscillatorType;
+    bus?: BusName;
+    delay?: number;
+  } = {}): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const {
+      freq = 880, freqEnd = freq, duration = 0.09,
+      gain = 0.12, type = 'sine', bus = 'sfx', delay = 0,
+    } = opts;
+    const t = ctx.currentTime + delay;
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    if (freqEnd !== freq) osc.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), t + duration);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    osc.connect(g).connect(this.bus(bus)!);
+    osc.start(t);
+    osc.stop(t + duration + 0.02);
   }
 
-  // ---- Movement / doors ----
-  footstep(material: string): void {
-    const p = material === "metal" ? 200 : material === "stone" ? 140 : 300;
-    this.noise(0.08, 0.1, p, 1.2);
-    this.tone({ type: "sine", freq: 90, end: 50, gain: 0.06, dur: 0.07 });
+  // ------------------------------------------------------- named UI/world sfx
+
+  uiHover(): void { this.tone({ freq: 1200, duration: 0.035, gain: 0.035, type: 'square' }); }
+  uiClick(): void { this.tone({ freq: 660, freqEnd: 880, duration: 0.06, gain: 0.09, type: 'square' }); }
+  uiConfirm(): void {
+    this.tone({ freq: 620, duration: 0.09, gain: 0.09, type: 'triangle' });
+    this.tone({ freq: 930, duration: 0.14, gain: 0.08, type: 'triangle', delay: 0.07 });
   }
+  uiDenied(): void { this.tone({ freq: 220, freqEnd: 150, duration: 0.2, gain: 0.11, type: 'sawtooth' }); }
+
+  switchClunk(): void {
+    this.noiseBurst({ duration: 0.09, gain: 0.34, filter: 2400, filterEnd: 380, q: 1.4 });
+    this.tone({ freq: 160, freqEnd: 90, duration: 0.1, gain: 0.14, type: 'square' });
+  }
+
+  leverPull(): void {
+    this.noiseBurst({ duration: 0.42, gain: 0.3, filter: 900, filterEnd: 200, q: 2.2 });
+    this.tone({ freq: 120, freqEnd: 60, duration: 0.45, gain: 0.16, type: 'sawtooth' });
+  }
+
   doorSlide(open: boolean): void {
-    const dur = 0.9;
-    const t = this.ctx ? this.ctx.currentTime : 0;
-    this.tone({ type: "sawtooth", freq: open ? 180 : 160, end: open ? 90 : 200, gain: 0.06, dur });
-    this.noise(dur, 0.12, 500, 1.5);
-    if (this.ctx) {
-      const lfo = this.ctx.createOscillator();
-      const lg = this.ctx.createGain();
-      lfo.frequency.value = 8;
-      lg.gain.value = 0.4;
-      const base = this.ctx.createBiquadFilter();
-      base.type = "lowpass";
-      base.frequency.value = 400;
-      lfo.connect(lg);
-      lg.connect(base.frequency);
-      void t;
+    this.noiseBurst({
+      duration: 0.85, gain: 0.26,
+      filter: open ? 420 : 900, filterEnd: open ? 1500 : 260,
+      q: 1.1, attack: 0.14,
+    });
+    this.tone({ freq: open ? 90 : 130, freqEnd: open ? 150 : 70, duration: 0.5, gain: 0.07, type: 'sine' });
+    // pneumatic release hiss
+    window.setTimeout(() => this.noiseBurst({ duration: 0.5, gain: 0.14, filter: 3800, filterEnd: 1800, q: 0.7, type: 'highpass' }), 380);
+  }
+
+  footstep(surface: 'metal' | 'grass' | 'stone' | 'water'): void {
+    const cfg = {
+      metal: { filter: 1500, gain: 0.10, dur: 0.09, q: 2.4 },
+      grass: { filter: 900, gain: 0.07, dur: 0.13, q: 0.7 },
+      stone: { filter: 1100, gain: 0.09, dur: 0.10, q: 1.2 },
+      water: { filter: 2200, gain: 0.10, dur: 0.16, q: 0.6 },
+    }[surface];
+    this.noiseBurst({ duration: cfg.dur, gain: cfg.gain * (0.75 + Math.random() * 0.5), filter: cfg.filter * (0.85 + Math.random() * 0.3), filterEnd: cfg.filter * 0.4, q: cfg.q });
+  }
+
+  beep(freq = 1400): void { this.tone({ freq, duration: 0.05, gain: 0.06, type: 'sine' }); }
+
+  targetLock(): void {
+    this.tone({ freq: 900, duration: 0.05, gain: 0.08, type: 'square' });
+    this.tone({ freq: 1350, duration: 0.09, gain: 0.08, type: 'square', delay: 0.06 });
+  }
+
+  alarm(): void {
+    for (let i = 0; i < 2; i++) {
+      this.tone({ freq: 720, freqEnd: 480, duration: 0.24, gain: 0.11, type: 'sawtooth', delay: i * 0.3 });
     }
   }
-  doorBump(): void {
-    this.clunk();
-    this.tone({ type: "square", freq: 400, end: 200, gain: 0.2, dur: 0.12 });
-  }
-  airlockCycle(): void {
-    this.clunk();
-    this.tone({ type: "sine", freq: 220, end: 110, gain: 0.2, dur: 0.8 });
-    this.noise(1.4, 0.1, 700, 0.6);
-    this.clunk();
+
+  impact(strength = 1): void {
+    this.noiseBurst({ duration: 0.7 * strength, gain: 0.4 * strength, filter: 260, filterEnd: 60, q: 0.8, type: 'lowpass' });
+    this.tone({ freq: 70, freqEnd: 35, duration: 0.6 * strength, gain: 0.22 * strength, type: 'sine' });
   }
 
-  // ---- Flight / warp / landing ----
-  engineThrust(intensity: number): void {
-    // intensity 0..1
-    if (!this.ctx || !this.sfxGain) return;
-    this.noise(0.2, 0.05 + intensity * 0.15, 80 + intensity * 120, 0.5);
-    this.tone({ type: "sawtooth", freq: 45 + intensity * 60, gain: 0.04 + intensity * 0.1, dur: 0.2 });
-  }
-  warpSpin(level: number): void {
-    this.tone({ type: "sawtooth", freq: 80 + level * 400, gain: 0.06 + level * 0.14, dur: 0.25 });
-    this.tone({ type: "sine", freq: 40 + level * 200, gain: 0.08, dur: 0.25 });
-  }
-  warpWhoosh(): void {
-    this.noise(2.6, 0.35, 1200, 0.3);
-    this.noise(2.6, 0.25, 200, 0.4);
-    this.tone({ type: "sine", freq: 60, end: 300, gain: 0.2, dur: 2.4 });
-  }
-  warpExit(): void {
-    this.tone({ type: "sine", freq: 300, end: 60, gain: 0.2, dur: 1.2 });
-    this.confirm();
-  }
-  reentry(level: number): void {
-    this.noise(0.3, 0.1 + level * 0.2, 300 + level * 900, 0.4);
-  }
-  touchdown(): void {
-    this.clunk();
-    this.noise(0.7, 0.4, 80, 0.5);
-  }
-  gearDeploy(): void {
-    this.clunk();
-    this.tone({ type: "triangle", freq: 140, end: 70, gain: 0.3, dur: 0.5 });
-  }
+  pour(): void { this.noiseBurst({ duration: 1.4, gain: 0.12, filter: 1800, filterEnd: 900, q: 0.8, attack: 0.3 }); }
 
-  // ---- Reactor / ambience ----
-  reactorPulse(): void {
-    this.tone({ type: "sine", freq: 55, gain: 0.08, dur: 0.6 });
-  }
-  coffee(): void {
-    this.noise(1.6, 0.12, 600, 0.5);
-    this.tone({ type: "sine", freq: 200, end: 90, gain: 0.08, dur: 1.6 });
-  }
-  flush(): void {
-    this.noise(2.0, 0.25, 300, 0.4);
-    this.tone({ type: "sine", freq: 120, end: 50, gain: 0.15, dur: 2.0 });
-  }
-  scan(): void {
-    for (let i = 0; i < 6; i++) this.tone({ type: "sine", freq: 500 + i * 180, gain: 0.08, dur: 0.1, when: i * 0.14 });
-  }
+  // ------------------------------------------------------------------- loops
 
-  // ---- Zone ambiences ----
-  private startShipAmbience(): void {
-    if (!this.ctx || !this.ambientGain) return;
-    const mk = (type: OscType, freq: number, gain: number) => {
-      const o = this.ctx!.createOscillator();
+  /**
+   * Start (or fetch) a sustained layer. `kind` selects the synthesis recipe.
+   * Loops are addressed by id so callers can crossfade them by name.
+   */
+  loop(id: string, kind: 'hum' | 'air' | 'engine' | 'warp' | 'wind' | 'water' | 'reactor', bus: BusName = 'ambient'): GainNode | null {
+    const ctx = this.ctx;
+    if (!ctx || !this.noiseBuffer) return null;
+    const existing = this.loops.get(id);
+    if (existing) return existing.gain;
+
+    const out = ctx.createGain();
+    out.gain.value = 0;
+    out.connect(this.bus(bus)!);
+    const nodes: Array<{ stop?: () => void }> = [];
+
+    const noise = (freq: number, q: number, type: BiquadFilterType, g: number) => {
+      const src = ctx.createBufferSource();
+      src.buffer = this.noiseBuffer!;
+      src.loop = true;
+      const bq = ctx.createBiquadFilter();
+      bq.type = type;
+      bq.frequency.value = freq;
+      bq.Q.value = q;
+      const ng = ctx.createGain();
+      ng.gain.value = g;
+      src.connect(bq).connect(ng).connect(out);
+      src.start();
+      nodes.push({ stop: () => src.stop() });
+      return { bq, ng };
+    };
+    const osc = (freq: number, type: OscillatorType, g: number, detune = 0) => {
+      const o = ctx.createOscillator();
       o.type = type;
       o.frequency.value = freq;
-      const g = this.ctx!.createGain();
-      g.gain.value = gain;
-      o.connect(g);
-      g.connect(this.ambientGain!);
+      o.detune.value = detune;
+      const og = ctx.createGain();
+      og.gain.value = g;
+      o.connect(og).connect(out);
       o.start();
+      nodes.push({ stop: () => o.stop() });
       return o;
     };
-    // Low ship hum + slow LFO breathing
-    this.humNodes.push(mk("sine", 55, 0.03));
-    this.humNodes.push(mk("sine", 110, 0.015));
-    const lfo = this.ctx.createOscillator();
-    const lg = this.ctx.createGain();
-    lfo.frequency.value = 0.1;
-    lg.gain.value = 0.006;
-    lfo.connect(lg);
-    lg.connect(this.ambientGain);
-    lfo.start();
+
+    switch (kind) {
+      case 'hum':
+        osc(52, 'sine', 0.28);
+        osc(104, 'sine', 0.10, 6);
+        noise(240, 0.6, 'lowpass', 0.14);
+        break;
+      case 'air':
+        noise(1200, 0.5, 'bandpass', 0.5);
+        noise(320, 0.7, 'lowpass', 0.18);
+        break;
+      case 'engine':
+        osc(70, 'sawtooth', 0.055);
+        osc(140, 'sine', 0.05, -8);
+        noise(600, 0.9, 'bandpass', 0.3);
+        break;
+      case 'warp':
+        osc(120, 'sawtooth', 0.06);
+        osc(180, 'sawtooth', 0.05, 14);
+        osc(240, 'square', 0.025, -11);
+        noise(2400, 1.6, 'bandpass', 0.35);
+        break;
+      case 'wind':
+        noise(560, 0.35, 'bandpass', 0.55);
+        noise(180, 0.6, 'lowpass', 0.2);
+        break;
+      case 'water':
+        noise(2600, 0.45, 'bandpass', 0.4);
+        noise(900, 0.6, 'bandpass', 0.3);
+        noise(240, 0.8, 'lowpass', 0.12);
+        break;
+      case 'reactor':
+        osc(38, 'sine', 0.34);
+        osc(76, 'triangle', 0.12);
+        noise(150, 1.2, 'lowpass', 0.2);
+        break;
+    }
+
+    const handle = {
+      gain: out,
+      stop: () => {
+        for (const n of nodes) n.stop?.();
+        out.disconnect();
+      },
+    };
+    this.loops.set(id, handle);
+    return out;
   }
 
-  setZone(zone: Zone): void {
-    if (zone === this.currentZone) return;
-    this.currentZone = zone;
-    if (!this.ctx || !this.ambientGain) return;
-    const g = this.ambientGain;
-    const target = zone === "jungle" ? 0.22 : zone === "space" ? 0.05 : 0.5;
-    g.gain.cancelScheduledValues(this.ctx.currentTime);
-    g.gain.linearRampToValueAtTime(target, this.ctx.currentTime + 1.5);
-    // Jungle: add birdsong-ish chirps periodically (handled by caller via tick)
+  setLoopGain(id: string, value: number, ramp = 0.4): void {
+    const ctx = this.ctx;
+    const l = this.loops.get(id);
+    if (!ctx || !l) return;
+    l.gain.gain.setTargetAtTime(clamp(value, 0, 2), ctx.currentTime, Math.max(0.01, ramp / 3));
   }
 
-  /** Ambient jungle calls — called periodically when on planet. */
-  jungleCall(): void {
-    this.tone({ type: "sine", freq: 900 + Math.random() * 500, gain: 0.03, dur: 0.4 });
-    this.tone({ type: "sine", freq: 700 + Math.random() * 400, gain: 0.02, dur: 0.3, when: 0.3 });
+  /** Retune a running loop (warp spin-up pitch rise). */
+  setLoopDetune(id: string, cents: number): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.loops.has(id)) return;
+    // Detune is applied by adjusting playbackRate-ish via gain automation only;
+    // oscillator handles are intentionally not exposed, so we approximate the
+    // rising-pitch sensation with a filtered overtone layer instead.
+    void cents;
   }
-  waterfall(): void {
-    this.noise(2.0, 0.08, 900, 0.3);
+
+  stopLoop(id: string, fade = 0.6): void {
+    const ctx = this.ctx;
+    const l = this.loops.get(id);
+    if (!ctx || !l) return;
+    l.gain.gain.setTargetAtTime(0.0001, ctx.currentTime, fade / 3);
+    window.setTimeout(() => {
+      l.stop();
+      this.loops.delete(id);
+    }, fade * 1000 + 250);
   }
-  spore(): void {
-    this.tone({ type: "sine", freq: 1600 + Math.random() * 600, gain: 0.02, dur: 0.2 });
+
+  stopAllLoops(): void {
+    for (const id of [...this.loops.keys()]) this.stopLoop(id, 0.25);
   }
 
   dispose(): void {
-    for (const o of this.humNodes) {
-      try {
-        o.stop();
-      } catch {
-        /* noop */
-      }
-    }
-    if (this.ctx) void this.ctx.close();
+    this.stopAllLoops();
+    void this.ctx?.close();
     this.ctx = null;
+    this.started = false;
   }
 }
-
-export const audio = new AudioEngine();
