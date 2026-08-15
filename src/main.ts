@@ -1,13 +1,20 @@
-import './style.css';
-import { Game } from './core/Game';
+import "./style.css";
+import { Game } from "./game";
 
-const canvas = document.querySelector<HTMLCanvasElement>('#game');
-const uiRoot = document.querySelector<HTMLElement>('#ui-root');
+console.log("Aurora Voyager — initializing.");
 
-if (!canvas || !uiRoot) throw new Error('Required game DOM elements are missing.');
-
-const game = new Game(canvas, uiRoot);
-game.boot();
-
-// Useful for browser-based smoke testing without exposing debug controls in the UI.
-Object.defineProperty(window, '__AEON_DRIFT__', { value: game, enumerable: false });
+window.addEventListener("load", () => {
+  try {
+    new Game();
+  } catch (err) {
+    console.error("Failed to start Aurora Voyager:", err);
+    const app = document.getElementById("app");
+    if (app) {
+      app.innerHTML =
+        '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ff2244;font-family:monospace;font-size:18px;text-align:center;padding:40px;">' +
+        "Aurora Voyager failed to start. Open the browser console for details.<br><br>" +
+        String(err) +
+        "</div>";
+    }
+  }
+});
