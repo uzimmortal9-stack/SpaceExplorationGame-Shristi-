@@ -23,6 +23,8 @@ import { Ship } from './world/ship/ship';
 import { ShipExterior } from './world/shipExterior';
 import { SolarSystem } from './world/space';
 
+export { runSmoke } from './smoke';
+
 export interface CaptureResult {
   scene: Scene;
   /** Suggested camera framing for the renderer. */

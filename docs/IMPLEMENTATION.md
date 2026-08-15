@@ -1,87 +1,144 @@
-# Aurora Voyager — Implementation Notes
+# Aurora Drift — Implementation Notes
 
-Technical architecture and design decisions for the game.
+Architecture and the reasoning behind the decisions that mattered.
 
 ## Stack
 
-- **Language:** TypeScript (strict), ES2022 modules.
-- **Engine:** three.js 0.179 (WebGL2).
-- **Build:** Vite 7 (`npm run dev` / `npm run build`).
-- **Audio:** 100% procedural WebAudio (no audio files).
+* **TypeScript** (strict, `noUnusedLocals`, `noImplicitOverride`), ES2022 modules
+* **three.js 0.180** (WebGL2)
+* **Vite 7** for dev server and bundling
+* **Web Audio API** — all audio synthesised at runtime, no sample files
+* **Python 3** (NumPy, Pillow) for the offline asset and verification tooling
+  (build-time only, never shipped)
 
 ## Module layout
 
-| Path | Responsibility |
-| ---- | -------------- |
-| `src/core/renderer.ts` | WebGL renderer, ACES tone mapping, PMREM HDRI environment, post (subtle bloom), starfield + space dome |
-| `src/core/input.ts` | Keyboard/mouse, pointer lock, per‑frame edge events |
-| `src/core/audio.ts` | Procedural synth: UI, doors, engines, warp, landing, ambience |
-| `src/core/tween.ts`, `math.ts` | Tween queue, seeded noise/RNG, AABB helpers |
-| `src/world/materials.ts` | PBR material library from real downloaded maps; emissive as accent only |
-| `src/world/assets.ts` | Loads real GLB / HDRI / textures from `public/assets` (prefers real files) |
-| `src/world/geo.ts`, `alignment.ts` | Beveled geometry helpers, pivot normalization / ground snapping |
-| `src/world/props.ts` | Authored ship props with correct pivots |
-| `src/world/ship.ts` | Ship interior: rooms, doors, collision, props, bridge |
-| `src/world/exterior.ts` | Visible hull (space / chase / landing) |
-| `src/world/solar.ts` | Sun + planets + moons + orbit lines, target list |
-| `src/world/jungle.ts` | Procedural alien terrain, instanced vegetation, ruins, waterfall, glowing pool |
-| `src/systems/player.ts` | FPS movement + collision (ship + planet terrain) |
-| `src/systems/collision.ts` | Circle‑vs‑AABB resolver |
-| `src/systems/doors.ts` | Sliding doors with obstruction safety |
-| `src/systems/interact.ts` | Proximity + facing interaction |
-| `src/systems/flight.ts` | 6‑DOF ship flight, camera modes, HUD data |
-| `src/systems/warp.ts` | Scripted warp sequence (spin‑up → tunnel → exit) |
-| `src/systems/landing.ts` | Scripted re‑entry + landing (plasma → cloud → descent → touchdown) |
-| `src/systems/save.ts` | localStorage state |
-| `src/ui/hud.ts` | DOM sci‑fi menus / HUD / interaction prompts |
-| `src/game.ts` | State machine + orchestration |
+```
+src/
+  core/
+    renderer.ts    WebGL device, PMREM environment loading, ACES, bloom,
+                   warp post-pass, quality presets, screen shake
+    input.ts       keyboard/mouse, pointer lock, semantic action bindings
+    audio.ts       procedural synthesis: noise beds, bursts, tones, drones
+    state.ts       phase machine + ship systems + typed event emitter
+    math.ts        easing, damping, deterministic RNG, value noise / fBm
+    events.ts      minimal typed pub/sub
+    shaders/       warp radial blur + chromatic aberration
+  assets/
+    manifest.ts    shape of public/assets/manifest.json
+    assetLoader.ts manifest-driven GLB/texture/HDRI loading, pivot
+                   normalisation, placeholder fallback
+    palette.ts     flat-colour palettisation for atlas-less kits
+    placeholder.ts the deliberately-obvious missing-asset stand-in
+  systems/
+    collision.ts   AABB world + uniform grid broad-phase + heightfield
+    player.ts      first-person capsule: accel, gravity, step-up, head bob,
+                   footsteps, seated transitions
+    interaction.ts proximity + look-at registry with prompts
+    doors.ts       bi-parting sliding doors, obstruction safety, interlocks
+    flight.ts      6-DOF rigid body, flight assist, 3 camera modes
+    warp.ts        charge → tunnel → exit with the post stack
+    descent.ts     six-stage atmospheric entry and landing cinematic
+  world/
+    materials.ts   shared PBR palette
+    space.ts       solar system: bodies, orbits, sun, starfield
+    planet.ts      terrain, instanced vegetation, waterfall, ruins, atmosphere
+    shipExterior.ts hull, gear, thrusters, strobes, heat shell
+    ship/
+      layout.ts    the deck plan — single source of truth
+      structure.ts modular shell assembly + collision
+      lighting.ts  per-room light rig
+      props.ts     placement helper (pivot-correct, collider-generating)
+      rooms*.ts    per-compartment fit-out and interactions
+      screens.ts   world-space diegetic display panels
+      ship.ts      assembly + per-frame tick
+  ui/hud.ts        HUD, overlays, settings, nav selector, credits
+  game.ts          orchestration, phase machine, scene switching
+  main.ts          boot screen, main menu
+  smoke.ts         headless integration test
+```
 
-## State machine
+## Key decisions
 
-`loading → menu → explore → flight → warp → orbit → landing → planet`
-(plus `paused`), all driven from `Game.frame()`.
+### Lighting is environment-first
 
-- **explore** — first‑person walk with ship collision; camera follows the player eye.
-- **flight / orbit** — camera is parented to the ship; the solar system is
-  rendered around a *virtual* ship position (`virtualShip`) so the hull stays at
-  scene origin (interior collision stays valid) while the world visibly moves.
-- **warp** — FOV/tint/shake effects; on exit the virtual position is placed in
-  orbit ahead of the target planet.
-- **landing** — the ship group descends at the landing site; the planet sphere
-  is hidden inside the cloud canopy and the procedural jungle is revealed so the
-  terrain visibly rises past the cockpit. Landing field is flattened to the full
-  ship footprint.
-- **planet** — first‑person walk on sampled terrain; signal source interaction
-  resolves the mission.
+The previous attempt failed by adding emissive material to fake brightness.
+Here the order is deliberate:
 
-## Lighting (the core fix vs. the previous attempt)
+1. A real HDRI through `PMREMGenerator` becomes `scene.environment`, so PBR
+   surfaces have something to reflect. `environmentIntensity` is tuned per
+   scene (0.42 interior, 0.85 planet).
+2. Physical lights shape the space: `RectAreaLight` ceiling panels sized per
+   room, point fills, shadow-casting spots on hero areas, a directional sun
+   with a hemisphere fill outdoors.
+3. Emissive is an accent only — screens, indicator LEDs, holograms, the warp
+   core, bioluminescence. Bloom carries it. Remove the lights and the ship is
+   dark, which is the correct test.
 
-1. **Real HDRI environment** loaded with `PMREMGenerator` (`studio` for the
-   ship, `night` for space, `forest` for the jungle) → PBR surfaces reflect
-   real light.
-2. **Real lights** — shadow‑casting directional sun, hemispheric fill, and
-   per‑room point lights.
-3. **Emissive is accent‑only** (indicators, strips, cores); brightness comes
-   from the environment + lights.
-4. ACES tone mapping, soft PCF shadows, subtle UnrealBloom.
+Only three interior lights cast shadows (bridge, warp core, cargo bay);
+everything else is unshadowed to keep the cost down.
 
-## Collision & doors
+### The deck plan is data
 
-- The interior registers axis‑aligned wall/floor boxes; the player is a circle
-  resolved axis‑separated for smooth sliding.
-- Doors embed a collision box that collapses on open and restores on close
-  (along the correct axis, X or Z), with an obstruction check so they never
-  close on the player.
+`layout.ts` declares rooms, corridors and doorways as rectangles on a 1 m grid.
+Structure, collision, lighting, signage and the debug teleport list are all
+derived from it, so they cannot drift apart.
 
-## Performance
+`structure.ts` reads the kit's *measured* module conventions rather than
+assuming them — wall panels run along local +Z with their inner face at local
+`x = max.x`, so a panel is placed by subtracting its own measured face offset.
+That one detail is what makes panels of different depths sit flush on the same
+boundary plane.
 
-- Instanced vegetation (trees, ferns, grass, rocks) and instanced props.
-- Particle systems use single `BufferGeometry` points updated in place.
-- Real tiled textures with `anisotropy`; limited shadow‑casting lights.
-- Frustum culling enabled by default.
+Wall runs are computed by subtracting doorway spans from each room edge, so an
+opening is exactly as wide as its door instead of deleting a whole 4 m panel.
+
+### Pivots are normalised, twice
+
+The USD→glTF converter bakes the requested pivot (bottom / centre / keep) into
+the vertex data. `AssetLoader.prepare()` then re-measures the bounding box and
+corrects any residual offset. `PropPlacer.place()` therefore just sets
+`y = floor` and the object sits exactly on the deck. Colliders are derived from
+the same measured bounds, so visual and physical footprints agree.
+
+### Two scenes, one continuous experience
+
+The ship (interior + exterior + solar system) and the planet surface are
+separate `Scene` objects for culling and fog reasons. The handoff happens
+*inside* the descent cinematic: the exterior hull is reparented into the planet
+scene at altitude, and on touchdown the whole ship interior is moved to the pad.
+There is no loading screen, and the player walks out of the same interior they
+flew in.
+
+Because the interior's colliders are authored in ship-local space, walking
+around on the surface uses a small proxy that offsets collision queries by the
+hull's world position — the player controller stays in world space throughout.
+
+### Instancing
+
+Structure modules are batched per source mesh into `InstancedMesh` (the whole
+hull is ~46 draw calls). Vegetation is instanced the same way, one batch per
+source mesh per scatter layer, with transforms generated by a deterministic RNG
+so the world regenerates identically.
 
 ## Verification
 
-`npm run typecheck` and `npm run build` pass. Scenes were exercised headlessly
-(software WebGL) and render without console errors; see README for the QA hook
-`window.__voyager.scene(...)`.
+No browser exists in the build environment, so the project carries its own:
+
+* `tools/glbview.py` — a software rasteriser (z-buffer, perspective-correct
+  interpolation, Lambert + Blinn-Phong, bilinear texture sampling, vertex
+  colours, back-to-front alpha compositing, ACES tone mapping)
+* `tools/contactsheet.py` — labelled grids of the model library with automatic
+  float/sink pivot flagging
+* `tools/capture.mjs` + `src/captureEntry.ts` — build the **real** game scenes
+  under Node (with DOM shims) and export to `.glb` for rendering
+* `src/smoke.ts` / `npm run smoke` — drives the real systems through the whole
+  mission loop and asserts collision, clearance, flight, warp, descent
+  monotonicity, terrain contact and asset health
+
+Bugs this caught that type-checking could not: inverted wall rotations, a kit
+"ceiling" module that was actually a vertical wall trim, doorways deleting
+entire wall panels, a corridor misaligned to the tile grid, a waterfall
+floating off its cliff, ruins half-drowned by terrain noise, room teleport
+anchors embedded inside props, and six models referencing textures that were
+never downloaded.

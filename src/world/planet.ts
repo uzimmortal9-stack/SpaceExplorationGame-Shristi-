@@ -58,6 +58,10 @@ const CLIFF_DROP = 40;
 const CLIFF_SHARPNESS = 2.6;
 const CLIFF_EDGE_OFFSET = 44;
 const POOL_RADIUS = 30;
+
+/** Ruin terrace — keeps the plaza level and above the waterline. */
+const RUIN_RADIUS = 34;
+const RUIN_LEVEL = 6.5;
 const POOL_FLOOR = -3.4;
 
 /** Landing pad centre; kept flat so the ship sits cleanly. */
@@ -240,6 +244,15 @@ export class Planet {
     if (dPool < POOL_RADIUS) {
       const k = 1 - smoothstep(dPool / POOL_RADIUS);
       h = lerp(h, POOL_FLOOR, k * 0.95);
+    }
+
+    // ---- ruin plateau ------------------------------------------------------
+    // The ruins sit on a raised, level terrace so the plaza reads as built and
+    // the monolith is never half-drowned by the surrounding noise.
+    const dRuin = Math.hypot(x - RUINS.x, z - RUINS.z);
+    if (dRuin < RUIN_RADIUS + 26) {
+      const k = 1 - smoothstep(clamp((dRuin - RUIN_RADIUS) / 26, 0, 1));
+      h = lerp(h, RUIN_LEVEL, k);
     }
 
     // flatten the landing pad

@@ -157,8 +157,8 @@ export const ROOM_TELEPORTS: Array<{ id: string; label: string; x: number; z: nu
   { id: 'medical', label: 'Medical Bay', x: 9, z: 18, yaw: -Math.PI / 2 },
   { id: 'science', label: 'Science Lab', x: -9, z: 24, yaw: Math.PI / 2 },
   { id: 'storage', label: 'Storage', x: -9, z: 34, yaw: Math.PI / 2 },
-  { id: 'fuel', label: 'Fuel Processing', x: 9, z: 28, yaw: -Math.PI / 2 },
-  { id: 'reactor', label: 'Reactor', x: 9, z: 47, yaw: -Math.PI / 2 },
-  { id: 'warp', label: 'Warp Drive', x: 0, z: 55, yaw: 0 },
+  { id: 'fuel', label: 'Fuel Processing', x: 7, z: 30, yaw: -Math.PI / 2 },
+  { id: 'reactor', label: 'Reactor', x: 6, z: 50, yaw: -Math.PI / 2 },
+  { id: 'warp', label: 'Warp Drive', x: -4.5, z: 59, yaw: 0 },
   { id: 'cargo', label: 'Cargo Bay', x: 0, z: 70, yaw: 0 },
 ];
