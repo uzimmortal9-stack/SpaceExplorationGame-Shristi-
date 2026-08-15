@@ -1,93 +1,127 @@
-# AEON DRIFT: The Verdant Signal
+# Aurora Voyager — Space Exploration
 
-A complete browser-based 3D space-exploration mission built from the repository’s master technical design. Explore the **CSV Astraea** in first person, bring its systems online, fly through a procedural solar system, warp to Nemora IV, survive atmospheric entry, land, cycle the airlock, and investigate a bioluminescent alien jungle.
+A fully playable, first-person **3D sci‑fi space exploration game** built with
+[three.js](https://threejs.org) and TypeScript. Explore a lived‑in starship
+interior, sit in the pilot seat, fly 6‑DOF through a small solar system, jump
+to **warp**, re‑enter an alien atmosphere, land on a jungle world, and explore
+its glowing pool, ruins and ancient ruins on foot.
 
-## Run locally
+> Built from scratch. Every texture and model is a **real, downloaded, legally
+> reusable asset** (Poly Haven, ambientCG, three.js sample assets, NASA) — no
+> runtime‑painted fake PBR. Lighting is driven by a **real HDRI environment
+> through PMREMGenerator** plus real lights; emissive is used only as an accent.
+
+---
+
+## Run it
 
 ```bash
 npm install
 npm run dev
+# open http://localhost:5173
 ```
 
-Open the URL printed by Vite. For a production bundle:
+Production build / preview:
 
 ```bash
-npm run build
+npm run build   # typecheck + bundle
 npm run preview
 ```
 
-## Required mission flow
+Requires a browser with WebGL2 (Chrome, Edge, Firefox, Safari all fine).
 
-1. Begin inside the Astraea and follow the central deck toward the bridge.
-2. Sit in either pilot seat with **E**.
-3. Look down/left, open the amber throttle safety lid, then press the physical thrust-arm button.
-4. Use the center navigation MFD to cycle targets until **NEMORA IV** is locked.
-5. Open the red warp safety cover and pull its physical lever.
-6. After warp exit, use the right-hand **Orbital Solution** display to initiate atmospheric entry.
-7. During the descent hold, press **G** to deploy landing gear.
-8. After touchdown, look away from a dashboard control and press **E** to stand.
-9. Walk to the aft cargo bay. Optionally equip the EVA suit, then operate the airlock/ramp panel.
-10. Follow the bioluminescent surface path to the glowing waterfall pool and resonant ruins.
+---
 
-Controls are shown once in-game and remain available under Settings. The exploration view deliberately has no permanent key legend, minimap, or health-bar overlay.
+## How to play
 
-## Controls
+- **Start** — click **START MISSION** on the main menu.
+- You spawn in the ship's main corridor. Move around, open the automatic
+  sliding doors, and explore the rooms.
 
-### On foot
+### Controls
 
-- **WASD** move
-- **Mouse** look
-- **Shift** sprint
-- **Space** jump
-- **C / Left Ctrl** crouch
-- **E** interact, sit, or stand
-- **F** helmet light
-- **Esc** pause
-- **Tab** mission reminder
+| Key | Action |
+| --- | ------ |
+| `W A S D` | Move |
+| `Mouse` | Look |
+| `Space` | Jump |
+| `Shift` | Sprint |
+| `Ctrl` | Crouch |
+| `E` / `Left Click` | Interact |
+| `F` | Sit / Stand |
+| `Esc` | Pause / menu |
 
-### Flight
+**Flight (pilot seat)**
 
-- **W / S** throttle and reverse
-- **Mouse** pitch/yaw
-- **Q / E** roll
-- **Shift** boost
-- **X** toggle dampeners
-- **C** cockpit/chase/orbital camera
-- **G** landing gear
+| Key | Action |
+| --- | ------ |
+| `W` / `S` | Throttle / reverse |
+| `I K J L` or arrows | Pitch / yaw |
+| `Q E` | Roll |
+| `Shift` | Boost |
+| `C` | Camera (cockpit → chase → orbital) |
+| `T` | Cycle warp target |
+| `B` | Auto‑land (assist) |
 
-### Hidden development diagnostics
+The full control list is also available in‑game under **Controls** (shown once
+on your first entry, reopenable from Settings).
 
-Press **Backtick** to reveal teleport, collision, noclip, wireframe, and sequence-skip tools.
+---
 
-## Architecture
+## The mission loop
 
-- `src/core` — input, runtime, procedural audio, saves, canvas display textures, deterministic random, tweening.
-- `src/world` — ship rooms/props/exterior, solar system, geometry normalization, collision, interaction, and procedural planet.
-- `src/systems` — player movement, doors, ambient animation, 6-DOF flight, collimated HUD, warp, entry, and landing.
-- `src/ui` — terminal/slate menus and contextual feedback.
-- `docs/UI_RESEARCH.md` — mandatory pre-implementation benchmark research and design translation.
-- `docs/IMPLEMENTATION.md` — system and room implementation map.
-- `ASSET_CREDITS.md` — complete dependency and asset manifest.
+1. **Explore the ship** — bridge/cockpit, crew cabins, washrooms, storage
+   (with a split‑glass freezer), fuel processing, comms, lounge, galley,
+   medical, defense, science lab, reactor, engineering/warp drive, life support,
+   power distribution, and a cargo bay with a rear ramp.
+2. **Reach the bridge**, sit in the **pilot seat** (`E`).
+3. **Open the safety lid** and engage the throttle, fly around the solar system.
+4. **Select a target** (`T`) — the story destination is **Lumis Prime**.
+5. **Open the red cover and pull the warp lever** to begin the warp jump
+   (spin‑up → tunnel → exit).
+6. **Descend into the atmosphere** (plasma re‑entry, cloud canopy) and **land**
+   (gear, touchdown dust).
+7. **Stand up**, walk to the **cargo ramp**, lower it, and step out onto the
+   alien jungle.
+8. Follow the **signal source** to the bioluminescent pool and the ancient
+   ruins for the resolution.
 
-## Technical highlights
+Everything transitions with composed cinematic camera work — no hard cuts.
 
-- TypeScript, Three.js/WebGL, Vite, Web Audio API.
-- CC0 HDRI image-based lighting and reflections (Poly Haven environments, bundled locally via `@pmndrs/assets` — no hot-linking) combined with authored runtime PBR detail maps (albedo, normal, roughness, baked AO) so no surface ships as flat color.
-- Deliberate lighting rig: rectangular area lights, spotlights, controlled ambient/hemisphere fill and a shadow-casting planetary sun.
-- Automated floor/wall/ceiling/centroid pivot normalization and downward ray-clamp placement pipeline.
-- Simplified AABB/cylinder collision hulls aligned to normalized geometry.
-- Collision-safe automatic doors with obstruction checks, plus a tween animator that gives lockers, freezer glass, crates, valves and levers smooth mechanical motion.
-- A cinematic director that composes keyframed camera shots for warp spin-up/tunnel/exit and atmospheric entry/landing, with a visible ground approach during final descent.
-- Full 6-DOF ship state, three flight cameras, target locking, fuel, dampeners, and physical interlocks.
-- Multi-stage warp, re-entry, gear hold, descent, touchdown dust, and persistent landed state.
-- LocalStorage checkpoints and settings.
-- Instanced vegetation, stars, spores, and asteroid belt for stable rendering.
+---
 
-## Validation
+## Tech highlights
 
-```bash
-npm run typecheck
-npm run build
+- **Real environment lighting** — Poly Haven HDRIs loaded through
+  `PMREMGenerator`; ACES tone mapping; subtle bloom.
+- **Real PBR materials** — downloaded albedo / normal / roughness maps
+  (ambientCG, three.js PBR samples). Emissive is accent‑only.
+- **Modular starship** — authored, beveled props with correct pivots, real
+  surface snapping, axis‑aligned collision, automatic sliding doors with
+  obstruction safety.
+- **Procedural alien world** — seeded value‑noise terrain, instanced vegetation,
+  ruins, waterfall and glowing pool with particle systems.
+- **Procedural audio** — the entire soundtrack and effects are synthesized with
+  the WebAudio API (no audio files required).
+- **Performance** — instancing for vegetation, pooled particle points,
+  frustum culling, tiled real textures, limited shadow‑casting lights.
+
+## Project structure
+
+```
+src/
+  main.ts              entry point
+  game.ts              state machine & orchestration
+  core/                renderer, input, audio, tween, math
+  world/               materials, geometry, assets, ship, exterior, solar, jungle
+  systems/             player, collision, doors, interact, flight, warp, landing, save
+  ui/                  DOM sci‑fi HUD / menus
+public/assets/         downloaded GLB models, HDRI, and PBR texture sets
 ```
 
-The game is designed for desktop browsers with WebGL2, keyboard/mouse input, and Web Audio support.
+## External assets
+
+See **[ASSET_CREDITS.md](ASSET_CREDITS.md)** for every external asset, its
+author, source and license, and **[ASSET_DOWNLOAD_MANIFEST.md](ASSET_DOWNLOAD_MANIFEST.md)**
+for the optional, higher‑quality texture sets you can drop in for even better
+planet surface materials.
